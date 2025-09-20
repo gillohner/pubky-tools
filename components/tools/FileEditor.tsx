@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
 import {
   AlertCircle,
+  ArrowLeft,
   CheckCircle,
   Clock,
   Code,
@@ -19,6 +20,7 @@ import {
   Edit,
   Eye,
   FileText,
+  Folder,
   Maximize2,
   Minimize2,
   RefreshCw,
@@ -32,6 +34,8 @@ interface FileEditorProps {
   initialPath?: string;
   onFileChange?: (file: PubkyFile) => void;
   readOnlyMode?: boolean;
+  onBackToBrowser?: () => void;
+  currentFolderPath?: string;
 }
 
 const FILE_SCHEMAS: { [key: string]: FileSchema } = {
@@ -179,7 +183,7 @@ const FILE_SCHEMAS: { [key: string]: FileSchema } = {
 };
 
 export function FileEditor(
-  { file, initialPath, onFileChange, readOnlyMode = false }: FileEditorProps,
+  { file, initialPath, onFileChange, readOnlyMode = false, onBackToBrowser, currentFolderPath }: FileEditorProps,
 ) {
   const { state } = useAuth();
   const { showSuccess, showError } = useToast();
@@ -423,12 +427,75 @@ export function FileEditor(
   const fileExtension = getFileExtension(fileName);
   const schema = getFileSchema(fileName);
 
+  // Helper function to create breadcrumbs from file path
+  const createBreadcrumbs = () => {
+    const pathToUse = currentFile?.path || filePath;
+    if (!pathToUse || !pathToUse.startsWith("pubky://")) return [];
+
+    const urlPath = pathToUse.replace("pubky://", "");
+    const pathParts = urlPath.split("/").filter(Boolean);
+
+    // Only show breadcrumbs for paths within /pub/
+    if (pathParts.length < 2 || pathParts[1] !== "pub") return [];
+
+    const breadcrumbs = [];
+
+    // Start from /pub/ onwards (skip homeserver and show from pub)
+    for (let i = 1; i < pathParts.length - 1; i++) { // -1 to exclude the filename
+      const path = `pubky://${pathParts.slice(0, i + 1).join("/")}/`;
+      const name = pathParts[i] === "pub" ? "pub" : pathParts[i];
+      breadcrumbs.push({
+        name,
+        path,
+      });
+    }
+
+    return breadcrumbs;
+  };
+
+  const breadcrumbs = createBreadcrumbs();
+
   return (
     <div
       className={`space-y-4 ${
         isFullscreen ? "fixed inset-0 z-50 bg-background p-4" : ""
       }`}
     >
+      {/* Breadcrumb Navigation */}
+      {(onBackToBrowser || breadcrumbs.length > 0) && !isFullscreen && (
+        <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
+          <div className="flex items-center space-x-2 text-sm">
+            {onBackToBrowser && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onBackToBrowser}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back to Browser
+              </Button>
+            )}
+            
+            {breadcrumbs.length > 0 && (
+              <>
+                {onBackToBrowser && <span className="text-muted-foreground">•</span>}
+                <Folder className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Location:</span>
+                {breadcrumbs.map((crumb, index) => (
+                  <span key={index} className="flex items-center space-x-1">
+                    <span className="text-muted-foreground">/</span>
+                    <span className="text-foreground">{crumb.name}</span>
+                  </span>
+                ))}
+                <span className="text-muted-foreground">/</span>
+                <span className="text-foreground font-medium">{fileName}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <Card className="h-full">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">

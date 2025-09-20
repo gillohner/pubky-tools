@@ -18,6 +18,7 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<PubkyFile | null>(null);
   const [editorPath, setEditorPath] = useState<string>("");
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [currentPath, setCurrentPath] = useState<string>("");
 
   const isAuthenticated = state.isAuthenticated;
   const readOnlyMode = !isAuthenticated;
@@ -25,7 +26,32 @@ export default function Home() {
   const handleFileSelect = (file: PubkyFile) => {
     setSelectedFile(file);
     setEditorPath(file.path);
+    
+    // Extract parent directory from file path to preserve folder location
+    const parentPath = getParentPath(file.path);
+    if (parentPath) {
+      setCurrentPath(parentPath);
+    }
+    
     setActiveTab("editor");
+  };
+
+  const handleBackToBrowser = () => {
+    setActiveTab("browser");
+  };
+
+  const getParentPath = (filePath: string): string => {
+    if (!filePath) return "";
+    
+    // Remove trailing slash if present
+    const normalizedPath = filePath.endsWith("/") ? filePath.slice(0, -1) : filePath;
+    
+    // Find the last slash
+    const lastSlashIndex = normalizedPath.lastIndexOf("/");
+    if (lastSlashIndex === -1) return "";
+    
+    // Return parent directory with trailing slash
+    return normalizedPath.substring(0, lastSlashIndex + 1);
   };
 
   const handleFileChange = (updatedFile: PubkyFile) => {
@@ -89,6 +115,8 @@ export default function Home() {
           onFileSelect={handleFileSelect}
           selectedFile={selectedFile}
           readOnlyMode={readOnlyMode}
+          currentPath={currentPath}
+          onPathChange={setCurrentPath}
         />
       )}
 
@@ -100,6 +128,8 @@ export default function Home() {
               initialPath={editorPath}
               onFileChange={handleFileChange}
               readOnlyMode={readOnlyMode}
+              onBackToBrowser={handleBackToBrowser}
+              currentFolderPath={currentPath}
             />
           )
           : (

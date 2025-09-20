@@ -41,14 +41,16 @@ interface FileBrowserProps {
   onFileSelect?: (file: PubkyFile) => void;
   selectedFile?: PubkyFile | null;
   readOnlyMode?: boolean;
+  currentPath?: string;
+  onPathChange?: (path: string) => void;
 }
 
 export function FileBrowser(
-  { onFileSelect, selectedFile, readOnlyMode = false }: FileBrowserProps,
+  { onFileSelect, selectedFile, readOnlyMode = false, currentPath: externalCurrentPath, onPathChange }: FileBrowserProps,
 ) {
   const { state } = useAuth();
   const { showSuccess, showError } = useToast();
-  const [currentPath, setCurrentPath] = useState("");
+  const [currentPath, setCurrentPath] = useState(externalCurrentPath || "");
   const [files, setFiles] = useState<PubkyFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -73,9 +75,25 @@ export function FileBrowser(
   useEffect(() => {
     if (state.user?.publicKey) {
       const userPath = `pubky://${state.user.publicKey}/pub/`;
-      setCurrentPath(userPath);
+      if (!externalCurrentPath) {
+        setCurrentPath(userPath);
+      }
     }
-  }, [state.user]);
+  }, [state.user, externalCurrentPath]);
+
+  // Sync external currentPath with internal state
+  useEffect(() => {
+    if (externalCurrentPath && externalCurrentPath !== currentPath) {
+      setCurrentPath(externalCurrentPath);
+    }
+  }, [externalCurrentPath]);
+
+  // Notify parent when currentPath changes
+  useEffect(() => {
+    if (onPathChange && currentPath) {
+      onPathChange(currentPath);
+    }
+  }, [currentPath, onPathChange]);
 
   const loadFiles = useCallback(async (useCache = true) => {
     if (!currentPath) return;
