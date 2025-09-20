@@ -515,7 +515,8 @@ export function FileEditor(
             </div>
 
             <div className="flex items-center space-x-2">
-              {!readOnlyMode && (
+              {/* TODO: New file button */}
+              {!readOnlyMode && false && (
                 <Button
                   variant="outline"
                   size="sm"
