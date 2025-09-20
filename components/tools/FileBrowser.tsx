@@ -109,33 +109,6 @@ export function FileBrowser(
     setCurrentPath(path);
   };
 
-  const navigateUp = () => {
-    if (currentPath && state.user?.publicKey) {
-      const basePath = `pubky://${state.user.publicKey}/pub/`;
-
-      // Don't go above the base path
-      if (currentPath === basePath) {
-        return;
-      }
-
-      const pathParts = currentPath.split("/");
-      if (pathParts.length > 4) { // Keep at least pubky://user/pub/
-        pathParts.pop();
-        if (pathParts[pathParts.length - 1] === "") {
-          pathParts.pop();
-        }
-        const newPath = pathParts.join("/") + "/";
-
-        // Ensure we don't go above the base path
-        if (newPath >= basePath) {
-          setCurrentPath(newPath);
-        } else {
-          setCurrentPath(basePath);
-        }
-      }
-    }
-  };
-
   const handleFileClick = (file: PubkyFile) => {
     if (file.isDirectory) {
       navigateToPath(file.path + (file.path.endsWith("/") ? "" : "/"));
@@ -411,14 +384,6 @@ export function FileBrowser(
             </div>
 
             <div className="flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={navigateUp}
-                disabled={isLoading}
-              >
-                ↑ Up
-              </Button>
               {currentPath && (
                 <Button
                   variant="ghost"
