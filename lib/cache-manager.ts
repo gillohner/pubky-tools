@@ -1,13 +1,13 @@
 import { CacheEntry } from "@/types/index";
 
-// Mock SQLite implementation for now - will be replaced with actual SQLite
+// In-memory cache implementation for temporary data storage
 export class CacheManager {
   private static instance: CacheManager;
   private cache: Map<string, CacheEntry> = new Map();
   private readonly TTL_MS = 30 * 60 * 1000; // 30 minutes
 
   private constructor() {
-    this.initializeDatabase();
+    this.initializeCache();
   }
 
   public static getInstance(): CacheManager {
@@ -17,9 +17,9 @@ export class CacheManager {
     return CacheManager.instance;
   }
 
-  private initializeDatabase() {
-    // Mock initialization - replace with actual SQLite setup
-    console.log("Cache database initialized (mock)");
+  private initializeCache() {
+    // In-memory cache initialization
+    console.log("In-memory cache initialized");
   }
 
   public get(path: string): string | null {
