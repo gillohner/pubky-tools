@@ -2,18 +2,18 @@
 
 import {
   ChangeEvent,
-  KeyboardEvent,
   MouseEvent,
   useCallback,
   useEffect,
   useState,
 } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { FileOperations } from "@/lib/file-operations";
-import { PubkyFile } from "@/types/index";
+import { BlobManager } from "@/lib/blob-manager";
+import { PubkyFile, BlobMetadata } from "@/types/index";
 import {
   formatFileSize,
   getFileExtension,
@@ -22,18 +22,16 @@ import {
   isTextFile,
 } from "@/lib/utils";
 import { useToast } from "@/hooks/useToast";
+import { FileCreationDialog } from "@/components/tools/FileCreationDialog";
+import { PathBreadcrumb } from "@/components/ui/PathBreadcrumb";
 import {
-  ChevronRight,
-  Copy,
   Download,
   Edit,
   File,
   Folder,
-  FolderPlus,
-  Home,
+  Image as ImageIcon,
   Plus,
   RefreshCw,
-  Search,
   Trash2,
 } from "lucide-react";
 
@@ -43,10 +41,11 @@ interface FileBrowserProps {
   readOnlyMode?: boolean;
   currentPath?: string;
   onPathChange?: (path: string) => void;
+  onFileCreated?: (newFile?: PubkyFile) => void;
 }
 
 export function FileBrowser(
-  { onFileSelect, selectedFile, readOnlyMode = false, currentPath: externalCurrentPath, onPathChange }: FileBrowserProps,
+  { onFileSelect, selectedFile, readOnlyMode = false, currentPath: externalCurrentPath, onPathChange, onFileCreated }: FileBrowserProps,
 ) {
   const { state } = useAuth();
   const { showSuccess, showError } = useToast();
@@ -54,13 +53,11 @@ export function FileBrowser(
   const [files, setFiles] = useState<PubkyFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [directUrl, setDirectUrl] = useState("");
-  const [showNewFileDialog, setShowNewFileDialog] = useState(false);
-  const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
-  const [newFileName, setNewFileName] = useState("");
-  const [newFolderName, setNewFolderName] = useState("");
+  const [showCreationDialog, setShowCreationDialog] = useState(false);
+  const [blobMetadata, setBlobMetadata] = useState<Map<string, BlobMetadata>>(new Map());
 
   const fileOps = FileOperations.getInstance();
+  const blobManager = BlobManager.getInstance();
 
   // Check if user has write access to current directory
   const canWriteToCurrentPath = state.user && currentPath
@@ -86,7 +83,7 @@ export function FileBrowser(
     if (externalCurrentPath && externalCurrentPath !== currentPath) {
       setCurrentPath(externalCurrentPath);
     }
-  }, [externalCurrentPath]);
+  }, [externalCurrentPath, currentPath]);
 
   // Notify parent when currentPath changes
   useEffect(() => {
@@ -94,6 +91,32 @@ export function FileBrowser(
       onPathChange(currentPath);
     }
   }, [currentPath, onPathChange]);
+
+  // Load blob metadata for files that might be blob metadata
+  const loadBlobMetadata = useCallback(async (fileList: PubkyFile[]) => {
+    const newBlobMetadata = new Map<string, BlobMetadata>();
+
+    // Check each file to see if it contains blob metadata
+    const metadataPromises = fileList
+      .filter(file => !file.isDirectory && file.name && getFileExtension(file.name) === '')
+      .map(async (file) => {
+        try {
+          const content = await fileOps.readFile(file.path);
+          if (content) {
+            const metadata = blobManager.parseBlobMetadata(content);
+            if (metadata) {
+              newBlobMetadata.set(file.path, metadata);
+            }
+          }
+        } catch {
+          // Ignore errors - file might not be blob metadata
+          console.debug('Not blob metadata:', file.path);
+        }
+      });
+
+    await Promise.all(metadataPromises);
+    setBlobMetadata(newBlobMetadata);
+  }, [fileOps, blobManager]);
 
   const loadFiles = useCallback(async (useCache = true) => {
     if (!currentPath) return;
@@ -103,6 +126,9 @@ export function FileBrowser(
     try {
       const fileList = await fileOps.listFiles(currentPath, useCache);
       setFiles(fileList);
+
+      // Load blob metadata in the background
+      loadBlobMetadata(fileList);
 
       if (!useCache) {
         showSuccess("Files refreshed");
@@ -114,17 +140,21 @@ export function FileBrowser(
     } finally {
       setIsLoading(false);
     }
-  }, [currentPath, fileOps, showSuccess, showError]);
+  }, [currentPath, fileOps, showSuccess, showError, loadBlobMetadata]);
 
   // Load files when path changes
   useEffect(() => {
     if (currentPath) {
       loadFiles();
     }
-  }, [currentPath, loadFiles]);
+  }, [loadFiles, currentPath]); // loadFiles already includes currentPath in its dependencies
 
   const navigateToPath = (path: string) => {
     setCurrentPath(path);
+    // Also notify parent component of path change
+    if (onPathChange) {
+      onPathChange(path);
+    }
   };
 
   const handleFileClick = (file: PubkyFile) => {
@@ -154,116 +184,13 @@ export function FileBrowser(
     loadFiles(false); // Force refresh without cache
   };
 
-  const handleDirectAccess = () => {
-    if (!directUrl.trim()) return;
-
-    const targetPath = directUrl.trim();
-
-    // Handle various input formats
-    if (targetPath.startsWith("pubky://")) {
-      // Already a complete pubky URL
-      setCurrentPath(targetPath);
-    } else if (targetPath.startsWith("pk:")) {
-      // pk:{pub} format - navigate to their /pub/ folder
-      const publicKey = targetPath.substring(3); // Remove 'pk:' prefix
-      setCurrentPath(`pubky://${publicKey}/pub/`);
-    } else if (targetPath.startsWith("/pub/")) {
-      // Relative path - use current user
-      const baseUser = state.user?.publicKey;
-      if (baseUser) {
-        setCurrentPath(`pubky://${baseUser}${targetPath}`);
-      }
-    } else if (targetPath.includes("/pub/")) {
-      // Contains /pub/ somewhere, try to extract the path
-      const pubIndex = targetPath.indexOf("/pub/");
-      const pathPart = targetPath.substring(pubIndex);
-      const baseUser = state.user?.publicKey;
-      if (baseUser) {
-        setCurrentPath(`pubky://${baseUser}${pathPart}`);
-      }
-    } else {
-      // Assume it's a public key, navigate to their /pub/
-      setCurrentPath(`pubky://${targetPath}/pub/`);
-    }
-
-    setDirectUrl("");
-  };
-
-  const handleCreateFile = async () => {
-    if (!newFileName.trim()) {
-      showError("Please enter a file name");
-      return;
-    }
-
-    if (!canWriteToCurrentPath) {
-      showError(
-        "You do not have write access to create files in this directory",
-      );
-      return;
-    }
-
-    // Ensure we don't double-append the current path
-    const fileName = newFileName.trim();
-    let filePath: string;
-
-    // If currentPath already ends with /, just append filename
-    if (currentPath.endsWith("/")) {
-      filePath = currentPath + fileName;
-    } else {
-      filePath = currentPath + "/" + fileName;
-    }
-
-    try {
-      const success = await fileOps.createFile(filePath, "");
-      if (success) {
-        showSuccess(`File "${fileName}" created successfully`);
-        setNewFileName("");
-        setShowNewFileDialog(false);
-        loadFiles(false);
-      } else {
-        showError("Failed to create file");
-      }
-    } catch (error) {
-      showError(`Failed to create file: ${error}`);
-    }
-  };
-
-  const handleCreateFolder = async () => {
-    if (!newFolderName.trim()) {
-      showError("Please enter a folder name");
-      return;
-    }
-
-    if (!canWriteToCurrentPath) {
-      showError(
-        "You do not have write access to create folders in this directory",
-      );
-      return;
-    }
-
-    // Ensure we don't double-append the current path
-    const folderName = newFolderName.trim();
-    let folderPath: string;
-
-    // If currentPath already ends with /, just append foldername/
-    if (currentPath.endsWith("/")) {
-      folderPath = currentPath + folderName + "/";
-    } else {
-      folderPath = currentPath + "/" + folderName + "/";
-    }
-
-    try {
-      const success = await fileOps.createDirectory(folderPath);
-      if (success) {
-        showSuccess(`Folder "${folderName}" created successfully`);
-        setNewFolderName("");
-        setShowNewFolderDialog(false);
-        loadFiles(false);
-      } else {
-        showError("Failed to create folder");
-      }
-    } catch (error) {
-      showError(`Failed to create folder: ${error}`);
+  const handleFileCreated = () => {
+    setShowCreationDialog(false);
+    loadFiles(false);
+    
+    // Notify parent component
+    if (onFileCreated) {
+      onFileCreated();
     }
   };
 
@@ -307,36 +234,27 @@ export function FileBrowser(
     }
   };
 
+  const getMediaTypeLabel = (metadata: BlobMetadata): { label: string; color: string } => {
+    const contentType = metadata.content_type.toLowerCase();
+    
+    if (contentType.startsWith('image/')) {
+      return { label: 'IMAGE', color: 'bg-purple-100 text-purple-800' };
+    }
+    if (contentType.startsWith('video/')) {
+      return { label: 'VIDEO', color: 'bg-red-100 text-red-800' };
+    }
+    if (contentType.startsWith('audio/')) {
+      return { label: 'AUDIO', color: 'bg-blue-100 text-blue-800' };
+    }
+    if (contentType === 'application/pdf') {
+      return { label: 'PDF', color: 'bg-orange-100 text-orange-800' };
+    }
+    return { label: 'BLOB', color: 'bg-gray-100 text-gray-800' };
+  };
+
   const filteredFiles = files.filter((file) =>
     file.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  // Improved breadcrumb handling for Pubky URLs - only show from /pub/ onwards
-  const createBreadcrumbs = () => {
-    if (!currentPath.startsWith("pubky://")) return [];
-
-    const urlPath = currentPath.replace("pubky://", "");
-    const pathParts = urlPath.split("/").filter(Boolean);
-
-    // Only show breadcrumbs for paths within /pub/
-    if (pathParts.length < 2 || pathParts[1] !== "pub") return [];
-
-    const breadcrumbs = [];
-
-    // Start from /pub/ onwards (skip homeserver and show from pub)
-    for (let i = 1; i < pathParts.length; i++) {
-      const path = `pubky://${pathParts.slice(0, i + 1).join("/")}/`;
-      const name = pathParts[i] === "pub" ? "pub" : pathParts[i];
-      breadcrumbs.push({
-        name,
-        path,
-      });
-    }
-
-    return breadcrumbs;
-  };
-
-  const breadcrumbs = createBreadcrumbs();
 
   return (
     <div className="space-y-6">
@@ -349,180 +267,112 @@ export function FileBrowser(
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Enhanced Pubky URL Access */}
-          <div className="space-y-2">
-            <div className="flex space-x-2">
-              <Input
-                placeholder="Enter pubky:// URL, pk:{publickey}, or path (e.g., pubky://user123.../pub/example.txt or pk:user123...)"
-                value={directUrl}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  setDirectUrl(e.target.value)}
-                onKeyDown={(e: KeyboardEvent<HTMLInputElement>) =>
-                  e.key === "Enter" && handleDirectAccess()}
-                className="flex-1"
-              />
-              <Button
-                onClick={handleDirectAccess}
-                disabled={!directUrl.trim() || isLoading}
-                variant="outline"
-              >
-                <Search className="h-4 w-4 mr-2" />
-                Open
-              </Button>
-            </div>
+          {/* Mobile breadcrumb */}
+          <div className="md:hidden">
+            <PathBreadcrumb 
+              path={currentPath || `pubky://${state.user?.publicKey || "unknown"}/pub/`}
+              onNavigate={navigateToPath}
+              showDefaultText={!state.user}
+              defaultText="Enter a pubky:// URL or login to browse your files"
+              className="w-full"
+              directEditing={!state.user}
+            />
           </div>
 
-          {/* Navigation bar */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2 text-sm">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  navigateToPath(`pubky://${state.user?.publicKey}/pub/`)}
-                disabled={isLoading}
-              >
-                <Home className="h-4 w-4" />
-              </Button>
-              {breadcrumbs.map((crumb, index) => (
-                <div key={index} className="flex items-center space-x-1">
-                  <ChevronRight className="h-4 w-4 text-gray-400" />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      navigateToPath(crumb.path)}
-                    className="text-blue-600 hover:text-blue-800"
-                    disabled={isLoading}
-                  >
-                    {crumb.name}
-                  </Button>
-                </div>
-              ))}
+          {/* Desktop: breadcrumb and actions on same line */}
+          <div className="hidden md:flex md:items-center md:space-x-4">
+            <div className="flex-1 min-w-0">
+              <PathBreadcrumb 
+                path={currentPath || `pubky://${state.user?.publicKey || "unknown"}/pub/`}
+                onNavigate={navigateToPath}
+                showDefaultText={!state.user}
+                defaultText="Enter a pubky:// URL or login to browse your files"
+                className="w-full"
+                directEditing={!state.user}
+              />
             </div>
-
-            <div className="flex items-center space-x-2">
-              {currentPath && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(currentPath);
-                    showSuccess("Path copied to clipboard");
-                  }}
-                  disabled={isLoading}
-                  title="Copy current path"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              )}
+            <div className="flex items-center space-x-2 flex-shrink-0">
+              <SearchInput
+                placeholder="Search files..."
+                value={searchTerm}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setSearchTerm(e.target.value)}
+              />
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleRefresh}
                 disabled={isLoading}
+                title="Refresh"
               >
                 <RefreshCw
                   className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
                 />
               </Button>
+              {!readOnlyMode && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCreationDialog(true)}
+                    disabled={isLoading || !canWriteToCurrentPath}
+                    title={!canWriteToCurrentPath
+                      ? "No write access to create files in this directory"
+                      : "Create new file, folder, or upload image"}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    New
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Search and actions */}
-          <div className="flex items-center space-x-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search files..."
-                value={searchTerm}
-                onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                  setSearchTerm(e.target.value)}
-                className="pl-10"
+          {/* Mobile: search and actions separate line */}
+          <div className="flex items-center space-x-2 md:hidden">
+            <SearchInput
+              placeholder="Search files..."
+              value={searchTerm}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setSearchTerm(e.target.value)}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isLoading}
+              title="Refresh"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
               />
-            </div>
+            </Button>
             {!readOnlyMode && (
               <>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowNewFileDialog(true)}
+                  onClick={() => setShowCreationDialog(true)}
                   disabled={isLoading || !canWriteToCurrentPath}
                   title={!canWriteToCurrentPath
                     ? "No write access to create files in this directory"
-                    : undefined}
+                    : "Create new file, folder, or upload image"}
                 >
                   <Plus className="h-4 w-4 mr-1" />
-                  New File
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowNewFolderDialog(true)}
-                  disabled={isLoading || !canWriteToCurrentPath}
-                  title={!canWriteToCurrentPath
-                    ? "No write access to create folders in this directory"
-                    : undefined}
-                >
-                  <FolderPlus className="h-4 w-4 mr-1" />
-                  New Folder
+                  New
                 </Button>
               </>
             )}
           </div>
 
-          {/* New file dialog */}
-          {!readOnlyMode && showNewFileDialog && (
-            <div className="p-4 border rounded-md bg-muted/30">
-              <h3 className="font-medium mb-2">Create New File</h3>
-              <div className="flex space-x-2">
-                <Input
-                  placeholder="Enter file name (e.g., document.txt)"
-                  value={newFileName}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setNewFileName(e.target.value)}
-                  onKeyDown={(e: KeyboardEvent<HTMLInputElement>) =>
-                    e.key === "Enter" && handleCreateFile()}
-                />
-                <Button onClick={handleCreateFile} size="sm">
-                  Create
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowNewFileDialog(false)}
-                  size="sm"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* New folder dialog */}
-          {!readOnlyMode && showNewFolderDialog && (
-            <div className="p-4 border rounded-md bg-muted/30">
-              <h3 className="font-medium mb-2">Create New Folder</h3>
-              <div className="flex space-x-2">
-                <Input
-                  placeholder="Enter folder name"
-                  value={newFolderName}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setNewFolderName(e.target.value)}
-                  onKeyDown={(e: KeyboardEvent<HTMLInputElement>) =>
-                    e.key === "Enter" && handleCreateFolder()}
-                />
-                <Button onClick={handleCreateFolder} size="sm">
-                  Create
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowNewFolderDialog(false)}
-                  size="sm"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
+          {/* File creation dialog */}
+          {!readOnlyMode && showCreationDialog && state.user && (
+            <FileCreationDialog
+              currentPath={currentPath}
+              userPublicKey={state.user.publicKey}
+              onFileCreated={handleFileCreated}
+              onCancel={() => setShowCreationDialog(false)}
+            />
           )}
 
           {/* File list */}
@@ -560,6 +410,8 @@ export function FileBrowser(
                         >
                           {file.isDirectory
                             ? <Folder className="h-5 w-5 text-blue-500" />
+                            : blobMetadata.has(file.path)
+                            ? <ImageIcon className="h-5 w-5 text-purple-500" />
                             : <File className="h-5 w-5 text-gray-400" />}
                           <div>
                             <div className="font-medium">{file.name}</div>
@@ -578,6 +430,15 @@ export function FileBrowser(
                                   {getFileExtension(file.name).toUpperCase()}
                                 </span>
                               )}
+                              {!file.isDirectory && blobMetadata.has(file.path) && (() => {
+                                const metadata = blobMetadata.get(file.path)!;
+                                const { label, color } = getMediaTypeLabel(metadata);
+                                return (
+                                  <span className={`ml-2 px-2 py-1 text-xs rounded ${color}`}>
+                                    {label}
+                                  </span>
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>

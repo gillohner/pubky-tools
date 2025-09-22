@@ -1,18 +1,18 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 
-// Mock better-sqlite3 for testing
-const mockDatabase = {
+// Mock cache storage for testing
+const mockCache = {
   exec: () => {},
-  prepare: (query) => ({
-    run: (...args) => ({ changes: 1 }),
+  prepare: (_query) => ({
+    run: (..._args) => ({ changes: 1 }),
     get: (...args) => {
       // Simulate cache behavior
       const key = args[0];
       const now = args[1];
       
-      if (mockDatabase._cache && mockDatabase._cache.has(key)) {
-        const entry = mockDatabase._cache.get(key);
+      if (mockCache._cache && mockCache._cache.has(key)) {
+        const entry = mockCache._cache.get(key);
         if (!now || (entry.created_at + entry.ttl > now)) {
           return { data: entry.data, created_at: entry.created_at, ttl: entry.ttl };
         }
@@ -26,7 +26,7 @@ const mockDatabase = {
 // Mock the FileCache class for testing
 class FileCache {
   constructor() {
-    this.db = mockDatabase;
+    this.cache = mockCache;
     this.DEFAULT_TTL = 5 * 60 * 1000; // 5 minutes
     this.cleanup();
   }
@@ -40,16 +40,16 @@ class FileCache {
 
   static resetInstance() {
     FileCache.instance = null;
-    mockDatabase._cache.clear();
+    mockCache._cache.clear();
   }
 
   cleanup() {
-    if (!mockDatabase._cache) return;
+    if (!mockCache._cache) return;
     
     const now = Date.now();
-    for (const [key, entry] of mockDatabase._cache.entries()) {
+    for (const [key, entry] of mockCache._cache.entries()) {
       if (entry.created_at + entry.ttl < now) {
-        mockDatabase._cache.delete(key);
+        mockCache._cache.delete(key);
       }
     }
   }
@@ -69,18 +69,18 @@ class FileCache {
       return; // Don't store immediately expired entries
     }
     
-    mockDatabase._cache.set(key, entry);
+    mockCache._cache.set(key, entry);
   }
 
   get(key) {
     const now = Date.now();
     
-    if (mockDatabase._cache && mockDatabase._cache.has(key)) {
-      const entry = mockDatabase._cache.get(key);
+    if (mockCache._cache && mockCache._cache.has(key)) {
+      const entry = mockCache._cache.get(key);
       // Handle TTL of 0 as immediately expired
       if (entry.ttl === 0 || entry.created_at + entry.ttl <= now) {
         // Remove expired entry
-        mockDatabase._cache.delete(key);
+        mockCache._cache.delete(key);
         return null;
       } else {
         return JSON.parse(entry.data);
@@ -91,19 +91,19 @@ class FileCache {
   }
 
   delete(key) {
-    if (mockDatabase._cache) {
-      mockDatabase._cache.delete(key);
+    if (mockCache._cache) {
+      mockCache._cache.delete(key);
     }
   }
 
   clear() {
-    if (mockDatabase._cache) {
-      mockDatabase._cache.clear();
+    if (mockCache._cache) {
+      mockCache._cache.clear();
     }
   }
 
   clearByPattern(pattern) {
-    if (!mockDatabase._cache) return;
+    if (!mockCache._cache) return;
     
     // Convert SQL LIKE pattern to regex
     const regexPattern = pattern
@@ -111,23 +111,23 @@ class FileCache {
       .replace(/_/g, '.');
     const regex = new RegExp(`^${regexPattern}$`);
     
-    for (const key of mockDatabase._cache.keys()) {
+    for (const key of mockCache._cache.keys()) {
       if (regex.test(key)) {
-        mockDatabase._cache.delete(key);
+        mockCache._cache.delete(key);
       }
     }
   }
 
   getStats() {
-    if (!mockDatabase._cache) {
+    if (!mockCache._cache) {
       return { totalEntries: 0, validEntries: 0 };
     }
     
     const now = Date.now();
-    let totalEntries = mockDatabase._cache.size;
+    const totalEntries = mockCache._cache.size;
     let validEntries = 0;
     
-    for (const entry of mockDatabase._cache.values()) {
+    for (const entry of mockCache._cache.values()) {
       if (entry.created_at + entry.ttl > now) {
         validEntries++;
       }
@@ -246,7 +246,7 @@ describe('FileCache', () => {
       assert.strictEqual(cache.get(key), value);
       
       // Check that entry exists in internal cache with default TTL
-      const entry = mockDatabase._cache.get(key);
+      const entry = mockCache._cache.get(key);
       assert.strictEqual(entry.ttl, cache.DEFAULT_TTL);
     });
 
@@ -371,7 +371,7 @@ describe('FileCache', () => {
 
     it('should handle malformed JSON in cache gracefully', () => {
       // Directly insert malformed data into mock cache
-      mockDatabase._cache.set('malformed', {
+      mockCache._cache.set('malformed', {
         data: '{"invalid": json}',
         created_at: Date.now(),
         ttl: 60000

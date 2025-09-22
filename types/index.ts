@@ -43,3 +43,17 @@ export interface Tool {
   icon: string;
   component: unknown; // React.ComponentType - simplified for Deno compatibility
 }
+
+export interface BlobMetadata {
+  name: string;
+  created_at: number;
+  src: string; // pubky:// URL to the blob data
+  content_type: string;
+  size: number;
+}
+
+export interface FileCreateOptions {
+  type: 'text' | 'json' | 'image' | 'folder';
+  name?: string;
+  path?: string;
+}

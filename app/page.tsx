@@ -1,29 +1,81 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { FileBrowser } from "@/components/tools/FileBrowser";
 import { FileEditor } from "@/components/tools/FileEditor";
+import { PathBreadcrumb } from "@/components/ui/PathBreadcrumb";
 import { LoginModal } from "@/components/auth/LoginModal";
 import { UnauthenticatedHeader } from "@/components/layout/UnauthenticatedHeader";
+import { MediaViewer } from "@/components/tools/MediaViewer";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { BlobManager } from "@/lib/blob-manager";
 import { PubkyFile } from "@/types/index";
 import { Eye } from "lucide-react";
 
-type Tab = "browser" | "editor";
+type Tab = "browser" | "editor" | "image";
 
 export default function Home() {
   const { state } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>("browser");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
+  // Get initial state from URL params
+  const initialTab = (searchParams?.get('tool') as Tab) || "browser";
+  const initialPath = searchParams?.get('path') || "";
+  
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [selectedFile, setSelectedFile] = useState<PubkyFile | null>(null);
-  const [editorPath, setEditorPath] = useState<string>("");
+  const [editorPath, setEditorPath] = useState<string>(initialPath);
+  const [imagePath, setImagePath] = useState<string>("");
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [currentPath, setCurrentPath] = useState<string>("");
+
+  const blobManager = BlobManager.getInstance();
 
   const isAuthenticated = state.isAuthenticated;
   const readOnlyMode = !isAuthenticated;
 
-  const handleFileSelect = (file: PubkyFile) => {
+  // Update URL when tab or path changes
+  const updateUrl = useCallback((tool: Tab, path?: string) => {
+    const params = new URLSearchParams();
+    params.set('tool', tool);
+    if (path) {
+      params.set('path', path);
+    }
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [router]);
+
+  // Sync initial URL parameters
+  useEffect(() => {
+    if (initialPath && !editorPath && !currentPath) {
+      setEditorPath(initialPath);
+      setCurrentPath(getParentPath(initialPath));
+    }
+  }, [initialPath, editorPath, currentPath]);
+
+  const handleFileSelect = async (file: PubkyFile) => {
+    // Check if file is blob metadata
+    if (!file.isDirectory) {
+      try {
+        const content = await fetch(`/api/files/read?path=${encodeURIComponent(file.path)}`).then(r => r.text());
+        const metadata = blobManager.parseBlobMetadata(content);
+        
+        if (metadata) {
+          // Open in Media Viewer
+          setImagePath(file.path);
+          setActiveTab("image");
+          updateUrl("image", file.path);
+          return;
+        }
+      } catch {
+        // Not blob metadata, continue with normal file handling
+        console.debug("Not blob metadata, opening in editor");
+      }
+    }
+
+    // Normal file handling
     setSelectedFile(file);
     setEditorPath(file.path);
     
@@ -34,10 +86,37 @@ export default function Home() {
     }
     
     setActiveTab("editor");
+    updateUrl("editor", file.path);
   };
 
   const handleBackToBrowser = () => {
     setActiveTab("browser");
+    updateUrl("browser", currentPath);
+  };
+
+  const handleFileCreated = useCallback((newFile?: PubkyFile) => {
+    // Always return to browser after creating a file
+    setActiveTab("browser");
+    updateUrl("browser", currentPath);
+    
+    // If a new file was created and can be edited, optionally open it
+    if (newFile && !newFile.isDirectory) {
+      // For now, just stay in browser - user can click to open
+      // Future: could add preference to auto-open created files
+    }
+  }, [currentPath, updateUrl]);
+
+  const handleNavigateToPath = (path: string) => {
+    setCurrentPath(path);
+    setActiveTab("browser");
+    updateUrl("browser", path);
+  };
+
+  const handleEditInTextEditor = (file: PubkyFile) => {
+    setSelectedFile(file);
+    setEditorPath(file.path);
+    setActiveTab("editor");
+    updateUrl("editor", file.path);
   };
 
   const getParentPath = (filePath: string): string => {
@@ -68,7 +147,10 @@ export default function Home() {
       <div className="bg-muted p-1 rounded-lg">
         <button
           type="button"
-          onClick={() => setActiveTab("browser")}
+          onClick={() => {
+            setActiveTab("browser");
+            updateUrl("browser", currentPath);
+          }}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             activeTab === "browser"
               ? "bg-background text-foreground shadow-sm"
@@ -79,7 +161,10 @@ export default function Home() {
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab("editor")}
+          onClick={() => {
+            setActiveTab("editor");
+            updateUrl("editor", editorPath);
+          }}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             activeTab === "editor"
               ? "bg-background text-foreground shadow-sm"
@@ -87,6 +172,20 @@ export default function Home() {
           }`}
         >
           File Editor
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("image");
+            updateUrl("image", imagePath);
+          }}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === "image"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Media Viewer
         </button>
       </div>
     </div>
@@ -117,6 +216,7 @@ export default function Home() {
           readOnlyMode={readOnlyMode}
           currentPath={currentPath}
           onPathChange={setCurrentPath}
+          onFileCreated={handleFileCreated}
         />
       )}
 
@@ -129,27 +229,87 @@ export default function Home() {
               onFileChange={handleFileChange}
               readOnlyMode={readOnlyMode}
               onBackToBrowser={handleBackToBrowser}
+              onNavigateToPath={handleNavigateToPath}
               currentFolderPath={currentPath}
             />
           )
           : (
-            <div className="flex items-center justify-center h-[400px] text-center">
-              <div className="space-y-3">
-                <div className="text-muted-foreground text-lg">
-                  No file selected
+            <div className="space-y-6">
+              <PathBreadcrumb 
+                path={currentPath || ""}
+                onNavigate={(path: string) => {
+                  // Try to open the file if it exists
+                  setEditorPath(path);
+                  setActiveTab("editor");
+                  updateUrl("editor", path);
+                }}
+                showDefaultText
+                context="editor"
+                className="w-full"
+                directEditing
+              />
+              <div className="flex items-center justify-center h-[300px] text-center">
+                <div className="space-y-3">
+                  <div className="text-muted-foreground text-lg">
+                    No file selected
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Use the search above to open a file directly, or browse files below
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("browser");
+                      updateUrl("browser", currentPath);
+                    }}
+                    className="text-blue-400 hover:text-blue-300 underline"
+                  >
+                    Go to File Browser
+                  </button>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  Select a file from the File Browser tab{!readOnlyMode
-                    ? " or create a new file"
-                    : ""} to start {readOnlyMode ? "viewing" : "editing"}
+              </div>
+            </div>
+          )
+      )}
+
+      {activeTab === "image" && (
+        imagePath
+          ? (
+            <MediaViewer
+              filePath={imagePath}
+              onNavigateToPath={handleNavigateToPath}
+              onEditInTextEditor={handleEditInTextEditor}
+              onBack={handleBackToBrowser}
+              readOnlyMode={readOnlyMode}
+            />
+          )
+          : (
+            <div className="space-y-4">
+              <PathBreadcrumb
+                path={currentPath || ""}
+                onNavigate={handleNavigateToPath}
+                context="image"
+                directEditing
+              />
+              <div className="flex items-center justify-center h-[400px] text-center">
+                <div className="space-y-3">
+                  <div className="text-muted-foreground text-lg">
+                    No image selected
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Select an image blob file from the File Browser to view it
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("browser");
+                      updateUrl("browser", currentPath);
+                    }}
+                    className="text-blue-400 hover:text-blue-300 underline"
+                  >
+                    Go to File Browser
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("browser")}
-                  className="text-blue-400 hover:text-blue-300 underline"
-                >
-                  Go to File Browser
-                </button>
               </div>
             </div>
           )

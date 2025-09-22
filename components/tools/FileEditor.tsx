@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/SearchInput";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { FileOperations } from "@/lib/file-operations";
@@ -10,9 +11,10 @@ import { FileSchema, PubkyFile } from "@/types/index";
 import { getFileExtension, hasWriteAccess, isOwnPath } from "@/lib/utils";
 import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
+import { NavigationHeader } from "@/components/ui/NavigationHeader";
+import { SyntaxHighlighter, getLanguage } from "@/components/ui/SyntaxHighlighter";
 import {
   AlertCircle,
-  ArrowLeft,
   CheckCircle,
   Clock,
   Code,
@@ -20,12 +22,10 @@ import {
   Edit,
   Eye,
   FileText,
-  Folder,
   Maximize2,
   Minimize2,
   RefreshCw,
   Save,
-  Search,
   Type,
 } from "lucide-react";
 
@@ -35,6 +35,7 @@ interface FileEditorProps {
   onFileChange?: (file: PubkyFile) => void;
   readOnlyMode?: boolean;
   onBackToBrowser?: () => void;
+  onNavigateToPath?: (path: string) => void;
   currentFolderPath?: string;
 }
 
@@ -183,7 +184,7 @@ const FILE_SCHEMAS: { [key: string]: FileSchema } = {
 };
 
 export function FileEditor(
-  { file, initialPath, onFileChange, readOnlyMode = false, onBackToBrowser, currentFolderPath }: FileEditorProps,
+  { file, initialPath, onFileChange, readOnlyMode = false, onBackToBrowser, onNavigateToPath }: FileEditorProps,
 ) {
   const { state } = useAuth();
   const { showSuccess, showError } = useToast();
@@ -316,6 +317,7 @@ export function FileEditor(
     }
   }, [content, originalContent, readOnlyMode]);
 
+  // Check if content is blob metadata
   const getFileSchema = (fileName: string): FileSchema | null => {
     const extension = getFileExtension(fileName);
     return Object.values(FILE_SCHEMAS).find((schema) =>
@@ -427,33 +429,20 @@ export function FileEditor(
   const fileExtension = getFileExtension(fileName);
   const schema = getFileSchema(fileName);
 
-  // Helper function to create breadcrumbs from file path
-  const createBreadcrumbs = () => {
+  // Get the directory path for the breadcrumb (remove filename)
+  const getDirectoryPath = () => {
     const pathToUse = currentFile?.path || filePath;
-    if (!pathToUse || !pathToUse.startsWith("pubky://")) return [];
-
-    const urlPath = pathToUse.replace("pubky://", "");
-    const pathParts = urlPath.split("/").filter(Boolean);
-
-    // Only show breadcrumbs for paths within /pub/
-    if (pathParts.length < 2 || pathParts[1] !== "pub") return [];
-
-    const breadcrumbs = [];
-
-    // Start from /pub/ onwards (skip homeserver and show from pub)
-    for (let i = 1; i < pathParts.length - 1; i++) { // -1 to exclude the filename
-      const path = `pubky://${pathParts.slice(0, i + 1).join("/")}/`;
-      const name = pathParts[i] === "pub" ? "pub" : pathParts[i];
-      breadcrumbs.push({
-        name,
-        path,
-      });
+    if (!pathToUse || !pathToUse.startsWith("pubky://")) return "";
+    
+    // Remove the filename to get the directory path
+    const lastSlashIndex = pathToUse.lastIndexOf("/");
+    if (lastSlashIndex > -1) {
+      return pathToUse.substring(0, lastSlashIndex + 1);
     }
-
-    return breadcrumbs;
+    return pathToUse;
   };
 
-  const breadcrumbs = createBreadcrumbs();
+  const directoryPath = getDirectoryPath();
 
   return (
     <div
@@ -461,39 +450,26 @@ export function FileEditor(
         isFullscreen ? "fixed inset-0 z-50 bg-background p-4" : ""
       }`}
     >
-      {/* Breadcrumb Navigation */}
-      {(onBackToBrowser || breadcrumbs.length > 0) && !isFullscreen && (
-        <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3">
-          <div className="flex items-center space-x-2 text-sm">
-            {onBackToBrowser && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onBackToBrowser}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                Back to Browser
-              </Button>
-            )}
-            
-            {breadcrumbs.length > 0 && (
-              <>
-                {onBackToBrowser && <span className="text-muted-foreground">•</span>}
-                <Folder className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Location:</span>
-                {breadcrumbs.map((crumb, index) => (
-                  <span key={index} className="flex items-center space-x-1">
-                    <span className="text-muted-foreground">/</span>
-                    <span className="text-foreground">{crumb.name}</span>
-                  </span>
-                ))}
-                <span className="text-muted-foreground">/</span>
-                <span className="text-foreground font-medium">{fileName}</span>
-              </>
-            )}
-          </div>
-        </div>
+      {/* Navigation */}
+      {!isFullscreen && (
+        <NavigationHeader
+          path={directoryPath}
+          onNavigate={onNavigateToPath || onBackToBrowser ? (path) => {
+            if (onNavigateToPath) {
+              onNavigateToPath(path);
+            } else if (onBackToBrowser) {
+              onBackToBrowser();
+            }
+          } : undefined}
+          showBackButton={!!onBackToBrowser}
+          onBack={onBackToBrowser}
+          backButtonText="Back to Browser"
+          fileName={fileName}
+          showFileName={!!directoryPath}
+          context="editor"
+          variant="muted"
+          showCopyButton={false}
+        />
       )}
 
       <Card className="h-full">
@@ -609,20 +585,25 @@ export function FileEditor(
               )}
               {!readOnlyMode && (
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={() => setIsEditMode(!isEditMode)}
                   disabled={!canWrite}
-                  title={!canWrite
+                  aria-pressed={isEditMode}
+                  aria-label={isEditMode ? "Stop editing" : "Start editing"}
+                  title={
+                  !canWrite
                     ? "View-only mode (no write access)"
                     : isEditMode
-                    ? "Switch to view mode"
-                    : "Switch to edit mode"}
+                    ? "Stop editing"
+                    : "Start editing"
+                  }
                 >
-                  {isEditMode
-                    ? <Eye className="h-4 w-4" />
-                    : <Edit className="h-4 w-4" />}
-                  {isEditMode ? "View" : "Edit"}
+                  {isEditMode ? (
+                  <FileText className="h-4 w-4" />
+                  ) : (
+                  <Edit className="h-4 w-4" />
+                  )}
                 </Button>
               )}
               <Button
@@ -670,13 +651,13 @@ export function FileEditor(
             </div>
 
             <div className="flex items-center space-x-2">
-              <Input
+              <SearchInput
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-48 h-8"
+                containerClassName="w-48"
               />
-              <Search className="h-4 w-4 text-gray-400" />
             </div>
           </div>
 
@@ -703,14 +684,18 @@ export function FileEditor(
               : previewMode
               ? (
                 <div
-                  className="w-full h-full p-4 bg-card border border-border rounded prose prose-invert max-w-none overflow-auto"
+                  className="w-full h-full bg-card border border-border rounded overflow-auto"
                   style={{
                     minHeight: isFullscreen ? "calc(100vh - 200px)" : "400px",
                   }}
-                  dangerouslySetInnerHTML={{
-                    __html: content.replace(/\n/g, "<br>"),
-                  }}
-                />
+                >
+                  <SyntaxHighlighter
+                    code={content}
+                    language={getLanguage(fileExtension)}
+                    className="h-full"
+                    showLineNumbers
+                  />
+                </div>
               )
               : (
                 <textarea

@@ -314,4 +314,59 @@ export class FileOperations {
         return Math.floor(Math.random() * 1000) + 100;
     }
   }
+
+  /**
+   * Create a binary file (e.g., images, blobs)
+   */
+  public async createBinaryFile(filePath: string, data: Uint8Array): Promise<boolean> {
+    try {
+      const success = await this.pubkyClient.put(filePath, data);
+
+      if (success) {
+        // Invalidate parent directory cache to refresh file listing
+        const parentPath = this.getParentPath(filePath);
+        if (parentPath) {
+          await this.cacheManager.invalidate(parentPath);
+        }
+      }
+
+      return success;
+    } catch (error) {
+      console.error("Failed to create binary file:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Read a binary file
+   */
+  public async readBinaryFile(filePath: string): Promise<Uint8Array | null> {
+    try {
+      // Validate file path
+      if (!filePath || filePath.includes("Pubky Homeserver")) {
+        console.error("Invalid file path:", filePath);
+        return null;
+      }
+
+      // Fetch from homeserver (don't cache binary data)
+      const data = await this.pubkyClient.get(filePath);
+      return data;
+    } catch (error) {
+      console.error("Failed to read binary file:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Update a binary file
+   */
+  public async updateBinaryFile(filePath: string, data: Uint8Array): Promise<boolean> {
+    try {
+      const success = await this.pubkyClient.put(filePath, data);
+      return success;
+    } catch (error) {
+      console.error("Failed to update binary file:", error);
+      return false;
+    }
+  }
 }

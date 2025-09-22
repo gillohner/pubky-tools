@@ -47,6 +47,27 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      spacing: {
+        'breadcrumb-h': 'var(--breadcrumb-height)',
+        'breadcrumb-p': 'var(--breadcrumb-padding)',
+        'button-h': 'var(--button-height)',
+        'button-p': 'var(--button-padding)',
+        'input-h': 'var(--input-height)',
+        'input-p': 'var(--input-padding)',
+      },
+      fontSize: {
+        'breadcrumb': 'var(--breadcrumb-text)',
+        'button': 'var(--button-text)',
+        'input': 'var(--input-text)',
+      },
+      textColor: {
+        'breadcrumb': 'hsl(var(--foreground))',
+        'button': 'hsl(var(--foreground))',
+        'input': 'hsl(var(--foreground))',
+      },
+      maxWidth: {
+        'breadcrumb': 'var(--breadcrumb-max-width)',
+      },
     },
   },
   plugins: [],
