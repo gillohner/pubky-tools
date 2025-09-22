@@ -303,7 +303,7 @@ export function PathBreadcrumb({
                         onNavigate(buildPathUpTo(index));
                       }
                     }}
-                    className="px-breadcrumb-p py-1 h-breadcrumb-h min-w-0 max-breadcrumb bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 truncate text-breadcrumb"
+                    className="px-breadcrumb-p py-1 h-breadcrumb-h min-w-0 max-w-breadcrumb bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 truncate text-breadcrumb"
                     title={`Navigate to: ${segment}`}
                   >
                     {index === 0 ? truncateSegment(segment, typeof window !== 'undefined' && window.innerWidth < 768 ? 10 : 20) : segment}

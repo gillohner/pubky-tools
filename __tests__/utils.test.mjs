@@ -35,6 +35,14 @@ function isTextFile(filename) {
     ["readme", "license", "dockerfile"].includes(filename.toLowerCase());
 }
 
+function getFullFilePath(currentFile, filePath) {
+  return currentFile?.path || filePath || '';
+}
+
+function getFileName(currentFile, filePath, defaultName = "untitled") {
+  return currentFile?.name || filePath?.split("/").pop() || defaultName;
+}
+
 describe("Utils", () => {
   describe("getFileExtension", () => {
     it("should extract file extension correctly", () => {
@@ -110,6 +118,73 @@ describe("Utils", () => {
       assert.strictEqual(isTextFile("README"), true);
       assert.strictEqual(isTextFile("Dockerfile"), true);
       assert.strictEqual(isTextFile("LICENSE"), true);
+    });
+  });
+
+  describe("getFullFilePath", () => {
+    it("should return currentFile.path when available", () => {
+      const currentFile = { path: "pubky://user123/pub/documents/test.txt" };
+      const filePath = "pubky://user123/pub/backup.txt";
+      assert.strictEqual(getFullFilePath(currentFile, filePath), "pubky://user123/pub/documents/test.txt");
+    });
+
+    it("should return filePath when currentFile is null", () => {
+      const filePath = "pubky://user123/pub/backup.txt";
+      assert.strictEqual(getFullFilePath(null, filePath), "pubky://user123/pub/backup.txt");
+    });
+
+    it("should return filePath when currentFile is undefined", () => {
+      const filePath = "pubky://user123/pub/backup.txt";
+      assert.strictEqual(getFullFilePath(undefined, filePath), "pubky://user123/pub/backup.txt");
+    });
+
+    it("should return empty string when both currentFile and filePath are missing", () => {
+      assert.strictEqual(getFullFilePath(null, null), '');
+      assert.strictEqual(getFullFilePath(undefined, undefined), '');
+      assert.strictEqual(getFullFilePath(), '');
+    });
+
+    it("should prioritize currentFile.path over filePath", () => {
+      const currentFile = { path: "pubky://user123/pub/current.txt" };
+      const filePath = "pubky://user123/pub/fallback.txt";
+      assert.strictEqual(getFullFilePath(currentFile, filePath), "pubky://user123/pub/current.txt");
+    });
+  });
+
+  describe("getFileName", () => {
+    it("should return currentFile.name when available", () => {
+      const currentFile = { name: "test.txt" };
+      const filePath = "pubky://user123/pub/documents/backup.txt";
+      assert.strictEqual(getFileName(currentFile, filePath), "test.txt");
+    });
+
+    it("should extract filename from filePath when currentFile name is not available", () => {
+      const filePath = "pubky://user123/pub/documents/backup.txt";
+      assert.strictEqual(getFileName(null, filePath), "backup.txt");
+      assert.strictEqual(getFileName(undefined, filePath), "backup.txt");
+      assert.strictEqual(getFileName({}, filePath), "backup.txt");
+    });
+
+    it("should return default name when both currentFile name and filePath are missing", () => {
+      assert.strictEqual(getFileName(null, null), "untitled");
+      assert.strictEqual(getFileName(undefined, undefined), "untitled");
+      assert.strictEqual(getFileName({}, null), "untitled");
+    });
+
+    it("should use custom default name", () => {
+      assert.strictEqual(getFileName(null, null, "new-file.txt"), "new-file.txt");
+      assert.strictEqual(getFileName(undefined, undefined, "custom.md"), "custom.md");
+    });
+
+    it("should prioritize currentFile.name over filePath", () => {
+      const currentFile = { name: "current.txt" };
+      const filePath = "pubky://user123/pub/fallback.txt";
+      assert.strictEqual(getFileName(currentFile, filePath), "current.txt");
+    });
+
+    it("should handle complex file paths", () => {
+      const filePath = "pubky://user123/pub/documents/projects/nested/file.js";
+      assert.strictEqual(getFileName(null, filePath), "file.js");
     });
   });
 });

@@ -7,7 +7,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { FileOperations } from "@/lib/file-operations";
 import { BlobManager } from "@/lib/blob-manager";
 import { BlobMetadata, PubkyFile } from "@/types/index";
-import { formatFileSize, hasWriteAccess, getFileExtension } from "@/lib/utils";
+import { formatFileSize, hasWriteAccess, getFileExtension, getFullFilePath, getFileName } from "@/lib/utils";
 import { useToast } from "@/hooks/useToast";
 import { NavigationHeader } from "@/components/ui/NavigationHeader";
 import {
@@ -213,7 +213,7 @@ export function MediaViewer({
       setLoading(true);
       try {
         // Create file object from path
-        const fileName = filePath.split("/").pop() || "";
+        const fileName = getFileName(null, filePath);
         const fileObj: PubkyFile = {
           name: fileName,
           path: filePath,
@@ -515,7 +515,7 @@ export function MediaViewer({
     <div className="space-y-4">
       {/* Navigation */}
       <NavigationHeader
-        path={filePath} // Pass full file path instead of just directory
+        path={getFullFilePath(file, filePath)} // Use utility function for consistent behavior
         onNavigate={onNavigateToPath}
         showBackButton={!!onBack}
         onBack={onBack}

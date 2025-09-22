@@ -90,3 +90,24 @@ export function hasWriteAccess(
 export function isOwnPath(userPublicKey: string, filePath: string): boolean {
   return filePath.startsWith(`pubky://${userPublicKey}/`);
 }
+
+/**
+ * Get the full file path for breadcrumb display
+ * @param currentFile - File object with path property (optional)
+ * @param filePath - Direct file path string (fallback)
+ * @returns The full file path for display in breadcrumbs
+ */
+export function getFullFilePath(currentFile?: { path: string } | null, filePath?: string): string {
+  return currentFile?.path || filePath || '';
+}
+
+/**
+ * Get the filename from a file path or file object
+ * @param currentFile - File object with name property (optional)
+ * @param filePath - Direct file path string (fallback)
+ * @param defaultName - Default name to use if no filename can be extracted
+ * @returns The filename extracted from the path or file object
+ */
+export function getFileName(currentFile?: { name?: string } | null, filePath?: string, defaultName: string = "untitled"): string {
+  return currentFile?.name || filePath?.split("/").pop() || defaultName;
+}

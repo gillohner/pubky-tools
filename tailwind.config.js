@@ -60,11 +60,6 @@ export default {
         'button': 'var(--button-text)',
         'input': 'var(--input-text)',
       },
-      textColor: {
-        'breadcrumb': 'hsl(var(--foreground))',
-        'button': 'hsl(var(--foreground))',
-        'input': 'hsl(var(--foreground))',
-      },
       maxWidth: {
         'breadcrumb': 'var(--breadcrumb-max-width)',
       },

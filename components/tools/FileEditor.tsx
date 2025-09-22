@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { FileOperations } from "@/lib/file-operations";
 import { FileSchema, PubkyFile } from "@/types/index";
-import { getFileExtension, hasWriteAccess, isOwnPath } from "@/lib/utils";
+import { getFileExtension, hasWriteAccess, isOwnPath, getFullFilePath, getFileName } from "@/lib/utils";
 import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
 import { NavigationHeader } from "@/components/ui/NavigationHeader";
@@ -211,7 +211,7 @@ export function FileEditor(
   const fileOps = FileOperations.getInstance();
 
   // Check if user has write access to current file
-  const currentFilePath = currentFile?.path || filePath;
+  const currentFilePath = getFullFilePath(currentFile, filePath);
   const canWrite = state.user && currentFilePath
     ? hasWriteAccess(
       state.user.publicKey,
@@ -245,7 +245,7 @@ export function FileEditor(
   }, [currentFile, fileOps, showError]);
 
   const validateContent = useCallback(() => {
-    const fileName = currentFile?.name || filePath.split("/").pop() || "";
+    const fileName = getFileName(currentFile, filePath);
     const schema = getFileSchema(fileName);
 
     if (schema?.validate) {
@@ -254,7 +254,7 @@ export function FileEditor(
     } else {
       setValidationResult({ valid: true });
     }
-  }, [currentFile?.name, filePath, content]);
+  }, [currentFile, filePath, content]);
 
   const handleAutoSave = useCallback(async () => {
     if (!validationResult?.valid || !currentFile || readOnlyMode) return;
@@ -326,7 +326,7 @@ export function FileEditor(
   };
 
   const formatContent = () => {
-    const fileName = currentFile?.name || filePath.split("/").pop() || "";
+    const fileName = getFileName(currentFile, filePath);
     const schema = getFileSchema(fileName);
 
     if (schema?.format) {
@@ -351,7 +351,7 @@ export function FileEditor(
     setIsSaving(true);
 
     try {
-      const pathToSave = currentFile?.path || filePath;
+      const pathToSave = getFullFilePath(currentFile, filePath);
       if (!pathToSave) {
         showError("No file path specified");
         return;
@@ -411,8 +411,7 @@ export function FileEditor(
   const handleDownload = () => {
     if (!currentFile && !filePath) return;
 
-    const fileName = currentFile?.name || filePath.split("/").pop() ||
-      "untitled.txt";
+    const fileName = getFileName(currentFile, filePath, "untitled.txt");
     const blob = new Blob([content], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -425,24 +424,11 @@ export function FileEditor(
     showSuccess(`Downloaded ${fileName}`);
   };
 
-  const fileName = currentFile?.name || filePath.split("/").pop() || "untitled";
+  const fileName = getFileName(currentFile, filePath, "untitled");
   const fileExtension = getFileExtension(fileName);
   const schema = getFileSchema(fileName);
 
-  // Get the directory path for the breadcrumb (remove filename)
-  const getDirectoryPath = () => {
-    const pathToUse = currentFile?.path || filePath;
-    if (!pathToUse || !pathToUse.startsWith("pubky://")) return "";
-    
-    // Remove the filename to get the directory path
-    const lastSlashIndex = pathToUse.lastIndexOf("/");
-    if (lastSlashIndex > -1) {
-      return pathToUse.substring(0, lastSlashIndex + 1);
-    }
-    return pathToUse;
-  };
-
-  const directoryPath = getDirectoryPath();
+  const fullFilePath = getFullFilePath(currentFile, filePath);
 
   return (
     <div
@@ -453,7 +439,7 @@ export function FileEditor(
       {/* Navigation */}
       {!isFullscreen && (
         <NavigationHeader
-          path={directoryPath}
+          path={fullFilePath} // Show full file path for editing
           onNavigate={onNavigateToPath || onBackToBrowser ? (path) => {
             if (onNavigateToPath) {
               onNavigateToPath(path);
@@ -465,10 +451,11 @@ export function FileEditor(
           onBack={onBackToBrowser}
           backButtonText="Back to Browser"
           fileName={fileName}
-          showFileName={!!directoryPath}
+          showFileName={false} // Don't show separate filename since it's in the path
           context="editor"
           variant="muted"
           showCopyButton={false}
+          directEditing={true} // Enable direct editing of the file path
         />
       )}
 
