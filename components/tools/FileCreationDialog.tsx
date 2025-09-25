@@ -699,7 +699,9 @@ export function FileCreationDialog({
             <FolderPlus className="h-5 w-5 mr-3 flex-shrink-0" />
             <div className="text-left">
               <div className="font-medium">Create Folder</div>
-              <div className="text-xs text-muted-foreground mt-1">New directory</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                New directory
+              </div>
             </div>
           </Button>
         </CardContent>

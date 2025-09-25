@@ -442,8 +442,6 @@ export function FileBrowser(
             )}
           </div>
 
-
-
           {/* File list */}
           <div className="border rounded-md">
             {isLoading
