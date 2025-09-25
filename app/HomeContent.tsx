@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { FileBrowser } from "@/components/tools/FileBrowser";
 import { FileEditor } from "@/components/tools/FileEditor";
@@ -20,11 +20,11 @@ export default function HomeContent() {
   const { state } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
-  
+
   // Get initial state from URL params
-  const initialTab = (searchParams?.get('tool') as Tab) || "browser";
-  const initialPath = searchParams?.get('path') || "";
-  
+  const initialTab = (searchParams?.get("tool") as Tab) || "browser";
+  const initialPath = searchParams?.get("path") || "";
+
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [selectedFile, setSelectedFile] = useState<PubkyFile | null>(null);
   const [editorPath, setEditorPath] = useState<string>(initialPath);
@@ -39,17 +39,17 @@ export default function HomeContent() {
 
   // Helper function to get parent directory from file path
   const getParentPath = useCallback((filePath: string): string => {
-    if (!filePath || !filePath.includes('/')) return filePath;
-    const lastSlashIndex = filePath.lastIndexOf('/');
+    if (!filePath || !filePath.includes("/")) return filePath;
+    const lastSlashIndex = filePath.lastIndexOf("/");
     return filePath.substring(0, lastSlashIndex);
   }, []);
 
   // Update URL when tab or path changes
   const updateUrl = useCallback((tool: Tab, path?: string) => {
     const params = new URLSearchParams();
-    params.set('tool', tool);
+    params.set("tool", tool);
     if (path) {
-      params.set('path', path);
+      params.set("path", path);
     }
     router.replace(`?${params.toString()}`, { scroll: false });
   }, [router]);
@@ -66,9 +66,11 @@ export default function HomeContent() {
     // Check if file is blob metadata
     if (!file.isDirectory) {
       try {
-        const content = await fetch(`/api/files/read?path=${encodeURIComponent(file.path)}`).then(r => r.text());
+        const content = await fetch(
+          `/api/files/read?path=${encodeURIComponent(file.path)}`,
+        ).then((r) => r.text());
         const metadata = blobManager.parseBlobMetadata(content);
-        
+
         if (metadata) {
           // Open in Media Viewer
           setImagePath(file.path);
@@ -85,13 +87,13 @@ export default function HomeContent() {
     // Normal file handling
     setSelectedFile(file);
     setEditorPath(file.path);
-    
+
     // Extract parent directory from file path to preserve folder location
     const parentPath = getParentPath(file.path);
     if (parentPath) {
       setCurrentPath(parentPath);
     }
-    
+
     setActiveTab("editor");
     updateUrl("editor", file.path);
   };
@@ -105,7 +107,7 @@ export default function HomeContent() {
     // Always return to browser after creating a file
     setActiveTab("browser");
     updateUrl("browser", currentPath);
-    
+
     if (newFile) {
       setSelectedFile(null);
       // Don't auto-open the new file, just refresh the browser
@@ -131,33 +133,35 @@ export default function HomeContent() {
   const handleIntelligentNavigate = useCallback(async (path: string) => {
     // Clean the path
     const cleanPath = path.trim();
-    
+
     // If path ends with '/', it's definitely a directory
-    if (cleanPath.endsWith('/')) {
+    if (cleanPath.endsWith("/")) {
       setCurrentPath(cleanPath);
       setActiveTab("browser");
       updateUrl("browser", cleanPath);
       return;
     }
-    
+
     // If path looks like a directory path (no file extension), treat as directory
-    const fileName = cleanPath.split('/').pop() || '';
-    const hasExtension = fileName.includes('.') && !fileName.startsWith('.');
-    
+    const fileName = cleanPath.split("/").pop() || "";
+    const hasExtension = fileName.includes(".") && !fileName.startsWith(".");
+
     if (!hasExtension) {
       // Treat as directory, add trailing slash
-      const dirPath = cleanPath.endsWith('/') ? cleanPath : cleanPath + '/';
+      const dirPath = cleanPath.endsWith("/") ? cleanPath : cleanPath + "/";
       setCurrentPath(dirPath);
       setActiveTab("browser");
       updateUrl("browser", dirPath);
       return;
     }
-    
+
     // Path looks like a file, try to determine its type
     try {
-      const content = await fetch(`/api/files/read?path=${encodeURIComponent(cleanPath)}`).then(r => r.text());
+      const content = await fetch(
+        `/api/files/read?path=${encodeURIComponent(cleanPath)}`,
+      ).then((r) => r.text());
       const metadata = blobManager.parseBlobMetadata(content);
-      
+
       if (metadata) {
         // It's blob metadata, open in Media Viewer
         setImagePath(cleanPath);
@@ -168,13 +172,13 @@ export default function HomeContent() {
         setSelectedFile({
           name: fileName,
           path: cleanPath,
-          isDirectory: false
+          isDirectory: false,
         });
         setEditorPath(cleanPath);
         setActiveTab("editor");
         updateUrl("editor", cleanPath);
       }
-      
+
       // Update current path to the parent directory
       const parentPath = getParentPath(cleanPath);
       if (parentPath) {
@@ -183,12 +187,21 @@ export default function HomeContent() {
     } catch (error) {
       console.error("Error reading file:", error);
       // If file doesn't exist or can't be read, treat as directory
-      const dirPath = cleanPath.endsWith('/') ? cleanPath : cleanPath + '/';
+      const dirPath = cleanPath.endsWith("/") ? cleanPath : cleanPath + "/";
       setCurrentPath(dirPath);
       setActiveTab("browser");
       updateUrl("browser", dirPath);
     }
-  }, [blobManager, setCurrentPath, setActiveTab, updateUrl, setImagePath, setSelectedFile, setEditorPath, getParentPath]);
+  }, [
+    blobManager,
+    setCurrentPath,
+    setActiveTab,
+    updateUrl,
+    setImagePath,
+    setSelectedFile,
+    setEditorPath,
+    getParentPath,
+  ]);
 
   const renderTabNavigation = () => {
     if (!isAuthenticated) return null;
@@ -311,7 +324,7 @@ export default function HomeContent() {
             )
             : (
               <div className="space-y-6">
-                <PathBreadcrumb 
+                <PathBreadcrumb
                   path={currentPath || ""}
                   onNavigate={handleIntelligentNavigate}
                   showDefaultText
@@ -325,7 +338,8 @@ export default function HomeContent() {
                       No file selected
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Use the search above to open a file directly, or browse files below
+                      Use the search above to open a file directly, or browse
+                      files below
                     </div>
                     <button
                       type="button"

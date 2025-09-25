@@ -53,7 +53,7 @@ export interface BlobMetadata {
 }
 
 export interface FileCreateOptions {
-  type: 'text' | 'json' | 'image' | 'folder';
+  type: "text" | "json" | "image" | "folder";
   name?: string;
   path?: string;
 }

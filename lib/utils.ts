@@ -97,8 +97,11 @@ export function isOwnPath(userPublicKey: string, filePath: string): boolean {
  * @param filePath - Direct file path string (fallback)
  * @returns The full file path for display in breadcrumbs
  */
-export function getFullFilePath(currentFile?: { path: string } | null, filePath?: string): string {
-  return currentFile?.path || filePath || '';
+export function getFullFilePath(
+  currentFile?: { path: string } | null,
+  filePath?: string,
+): string {
+  return currentFile?.path || filePath || "";
 }
 
 /**
@@ -108,6 +111,10 @@ export function getFullFilePath(currentFile?: { path: string } | null, filePath?
  * @param defaultName - Default name to use if no filename can be extracted
  * @returns The filename extracted from the path or file object
  */
-export function getFileName(currentFile?: { name?: string } | null, filePath?: string, defaultName: string = "untitled"): string {
+export function getFileName(
+  currentFile?: { name?: string } | null,
+  filePath?: string,
+  defaultName: string = "untitled",
+): string {
   return currentFile?.name || filePath?.split("/").pop() || defaultName;
 }

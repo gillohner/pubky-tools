@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { FileOperations } from "@/lib/file-operations";
 import { BlobManager } from "@/lib/blob-manager";
-import { PubkyFile, BlobMetadata } from "@/types/index";
+import { BlobMetadata, PubkyFile } from "@/types/index";
 import {
   formatFileSize,
   getFileExtension,
@@ -45,7 +45,14 @@ interface FileBrowserProps {
 }
 
 export function FileBrowser(
-  { onFileSelect, selectedFile, readOnlyMode = false, currentPath: externalCurrentPath, onPathChange, onFileCreated }: FileBrowserProps,
+  {
+    onFileSelect,
+    selectedFile,
+    readOnlyMode = false,
+    currentPath: externalCurrentPath,
+    onPathChange,
+    onFileCreated,
+  }: FileBrowserProps,
 ) {
   const { state } = useAuth();
   const { showSuccess, showError } = useToast();
@@ -54,7 +61,9 @@ export function FileBrowser(
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreationDialog, setShowCreationDialog] = useState(false);
-  const [blobMetadata, setBlobMetadata] = useState<Map<string, BlobMetadata>>(new Map());
+  const [blobMetadata, setBlobMetadata] = useState<Map<string, BlobMetadata>>(
+    new Map(),
+  );
 
   const fileOps = FileOperations.getInstance();
   const blobManager = BlobManager.getInstance();
@@ -98,7 +107,9 @@ export function FileBrowser(
 
     // Check each file to see if it contains blob metadata
     const metadataPromises = fileList
-      .filter(file => !file.isDirectory && file.name && getFileExtension(file.name) === '')
+      .filter((file) =>
+        !file.isDirectory && file.name && getFileExtension(file.name) === ""
+      )
       .map(async (file) => {
         try {
           const content = await fileOps.readFile(file.path);
@@ -110,7 +121,7 @@ export function FileBrowser(
           }
         } catch {
           // Ignore errors - file might not be blob metadata
-          console.debug('Not blob metadata:', file.path);
+          console.debug("Not blob metadata:", file.path);
         }
       });
 
@@ -187,7 +198,7 @@ export function FileBrowser(
   const handleFileCreated = () => {
     setShowCreationDialog(false);
     loadFiles(false);
-    
+
     // Notify parent component
     if (onFileCreated) {
       onFileCreated();
@@ -234,22 +245,24 @@ export function FileBrowser(
     }
   };
 
-  const getMediaTypeLabel = (metadata: BlobMetadata): { label: string; color: string } => {
+  const getMediaTypeLabel = (
+    metadata: BlobMetadata,
+  ): { label: string; color: string } => {
     const contentType = metadata.content_type.toLowerCase();
-    
-    if (contentType.startsWith('image/')) {
-      return { label: 'IMAGE', color: 'bg-purple-100 text-purple-800' };
+
+    if (contentType.startsWith("image/")) {
+      return { label: "IMAGE", color: "bg-purple-100 text-purple-800" };
     }
-    if (contentType.startsWith('video/')) {
-      return { label: 'VIDEO', color: 'bg-red-100 text-red-800' };
+    if (contentType.startsWith("video/")) {
+      return { label: "VIDEO", color: "bg-red-100 text-red-800" };
     }
-    if (contentType.startsWith('audio/')) {
-      return { label: 'AUDIO', color: 'bg-blue-100 text-blue-800' };
+    if (contentType.startsWith("audio/")) {
+      return { label: "AUDIO", color: "bg-blue-100 text-blue-800" };
     }
-    if (contentType === 'application/pdf') {
-      return { label: 'PDF', color: 'bg-orange-100 text-orange-800' };
+    if (contentType === "application/pdf") {
+      return { label: "PDF", color: "bg-orange-100 text-orange-800" };
     }
-    return { label: 'BLOB', color: 'bg-gray-100 text-gray-800' };
+    return { label: "BLOB", color: "bg-gray-100 text-gray-800" };
   };
 
   const filteredFiles = files.filter((file) =>
@@ -269,8 +282,9 @@ export function FileBrowser(
         <CardContent className="space-y-4">
           {/* Mobile breadcrumb */}
           <div className="md:hidden">
-            <PathBreadcrumb 
-              path={currentPath || `pubky://${state.user?.publicKey || "unknown"}/pub/`}
+            <PathBreadcrumb
+              path={currentPath ||
+                `pubky://${state.user?.publicKey || "unknown"}/pub/`}
               onNavigate={navigateToPath}
               showDefaultText={!state.user}
               defaultText="Enter a pubky:// URL or login to browse your files"
@@ -282,8 +296,9 @@ export function FileBrowser(
           {/* Desktop: breadcrumb and actions on same line */}
           <div className="hidden md:flex md:items-center md:space-x-4">
             <div className="flex-1 min-w-0">
-              <PathBreadcrumb 
-                path={currentPath || `pubky://${state.user?.publicKey || "unknown"}/pub/`}
+              <PathBreadcrumb
+                path={currentPath ||
+                  `pubky://${state.user?.publicKey || "unknown"}/pub/`}
                 onNavigate={navigateToPath}
                 showDefaultText={!state.user}
                 defaultText="Enter a pubky:// URL or login to browse your files"
@@ -430,15 +445,20 @@ export function FileBrowser(
                                   {getFileExtension(file.name).toUpperCase()}
                                 </span>
                               )}
-                              {!file.isDirectory && blobMetadata.has(file.path) && (() => {
-                                const metadata = blobMetadata.get(file.path)!;
-                                const { label, color } = getMediaTypeLabel(metadata);
-                                return (
-                                  <span className={`ml-2 px-2 py-1 text-xs rounded ${color}`}>
-                                    {label}
-                                  </span>
-                                );
-                              })()}
+                              {!file.isDirectory &&
+                                blobMetadata.has(file.path) && (() => {
+                                  const metadata = blobMetadata.get(file.path)!;
+                                  const { label, color } = getMediaTypeLabel(
+                                    metadata,
+                                  );
+                                  return (
+                                    <span
+                                      className={`ml-2 px-2 py-1 text-xs rounded ${color}`}
+                                    >
+                                      {label}
+                                    </span>
+                                  );
+                                })()}
                             </div>
                           </div>
                         </div>

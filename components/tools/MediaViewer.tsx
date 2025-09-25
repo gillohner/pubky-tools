@@ -7,82 +7,108 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { FileOperations } from "@/lib/file-operations";
 import { BlobManager } from "@/lib/blob-manager";
 import { BlobMetadata, PubkyFile } from "@/types/index";
-import { formatFileSize, hasWriteAccess, getFileExtension, getFullFilePath, getFileName } from "@/lib/utils";
+import {
+  formatFileSize,
+  getFileExtension,
+  getFileName,
+  getFullFilePath,
+  hasWriteAccess,
+} from "@/lib/utils";
 import { useToast } from "@/hooks/useToast";
 import { NavigationHeader } from "@/components/ui/NavigationHeader";
 import {
   AlertCircle,
   Download,
   Edit,
+  FileText,
   Image as ImageIcon,
   RefreshCw,
   Video,
-  FileText,
 } from "lucide-react";
 
 // Helper function to detect content type from file content (magic bytes)
 const detectContentTypeFromBlob = (blobContent: Uint8Array): string => {
-  if (blobContent.length < 8) return 'application/octet-stream';
-  
+  if (blobContent.length < 8) return "application/octet-stream";
+
   // Check for common image formats by magic bytes
   const header = Array.from(blobContent.slice(0, 12)); // Increased to 12 bytes for better detection
-  
+
   // JPEG: FF D8 FF
   if (header[0] === 0xFF && header[1] === 0xD8 && header[2] === 0xFF) {
-    return 'image/jpeg';
+    return "image/jpeg";
   }
-  
+
   // PNG: 89 50 4E 47 0D 0A 1A 0A
-  if (header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47) {
-    return 'image/png';
+  if (
+    header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E &&
+    header[3] === 0x47
+  ) {
+    return "image/png";
   }
-  
+
   // GIF: 47 49 46 38 (GIF8)
-  if (header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46 && header[3] === 0x38) {
-    return 'image/gif';
+  if (
+    header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46 &&
+    header[3] === 0x38
+  ) {
+    return "image/gif";
   }
-  
+
   // WebP: starts with "RIFF" then "WEBP"
-  if (header[0] === 0x52 && header[1] === 0x49 && header[2] === 0x46 && header[3] === 0x46) {
+  if (
+    header[0] === 0x52 && header[1] === 0x49 && header[2] === 0x46 &&
+    header[3] === 0x46
+  ) {
     // Check for WEBP at offset 8
     if (blobContent.length > 11) {
       const webpHeader = Array.from(blobContent.slice(8, 12));
-      if (webpHeader[0] === 0x57 && webpHeader[1] === 0x45 && webpHeader[2] === 0x42 && webpHeader[3] === 0x50) {
-        return 'image/webp';
+      if (
+        webpHeader[0] === 0x57 && webpHeader[1] === 0x45 &&
+        webpHeader[2] === 0x42 && webpHeader[3] === 0x50
+      ) {
+        return "image/webp";
       }
     }
   }
-  
+
   // BMP: 42 4D (BM)
   if (header[0] === 0x42 && header[1] === 0x4D) {
-    return 'image/bmp';
+    return "image/bmp";
   }
-  
+
   // PDF: %PDF
-  if (header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46) {
-    return 'application/pdf';
+  if (
+    header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 &&
+    header[3] === 0x46
+  ) {
+    return "application/pdf";
   }
-  
+
   // MP4: various signatures
   if (blobContent.length > 11) {
     const mp4Header = Array.from(blobContent.slice(4, 12));
     // ftyp marker at offset 4
-    if (mp4Header[0] === 0x66 && mp4Header[1] === 0x74 && mp4Header[2] === 0x79 && mp4Header[3] === 0x70) {
-      return 'video/mp4';
+    if (
+      mp4Header[0] === 0x66 && mp4Header[1] === 0x74 && mp4Header[2] === 0x79 &&
+      mp4Header[3] === 0x70
+    ) {
+      return "video/mp4";
     }
   }
-  
+
   // ZIP: 50 4B 03 04 or 50 4B 05 06 or 50 4B 07 08
   if (header[0] === 0x50 && header[1] === 0x4B) {
-    if ((header[2] === 0x03 && header[3] === 0x04) ||
-        (header[2] === 0x05 && header[3] === 0x06) ||
-        (header[2] === 0x07 && header[3] === 0x08)) {
-      return 'application/zip';
+    if (
+      (header[2] === 0x03 && header[3] === 0x04) ||
+      (header[2] === 0x05 && header[3] === 0x06) ||
+      (header[2] === 0x07 && header[3] === 0x08)
+    ) {
+      return "application/zip";
     }
   }
-  
+
   // Default fallback
-  return 'application/octet-stream';
+  return "application/octet-stream";
 };
 
 // Helper function to get content type from file extension
@@ -90,50 +116,52 @@ const getContentTypeFromExtension = (fileName: string): string => {
   const extension = getFileExtension(fileName).toLowerCase();
   const mimeTypes: { [key: string]: string } = {
     // Images
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'png': 'image/png',
-    'gif': 'image/gif',
-    'webp': 'image/webp',
-    'svg': 'image/svg+xml',
-    'bmp': 'image/bmp',
-    'ico': 'image/x-icon',
-    'tiff': 'image/tiff',
-    'tif': 'image/tiff',
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "gif": "image/gif",
+    "webp": "image/webp",
+    "svg": "image/svg+xml",
+    "bmp": "image/bmp",
+    "ico": "image/x-icon",
+    "tiff": "image/tiff",
+    "tif": "image/tiff",
     // Videos
-    'mp4': 'video/mp4',
-    'webm': 'video/webm',
-    'ogv': 'video/ogg',
-    'avi': 'video/x-msvideo',
-    'mov': 'video/quicktime',
-    'wmv': 'video/x-ms-wmv',
-    'flv': 'video/x-flv',
-    'mkv': 'video/x-matroska',
+    "mp4": "video/mp4",
+    "webm": "video/webm",
+    "ogv": "video/ogg",
+    "avi": "video/x-msvideo",
+    "mov": "video/quicktime",
+    "wmv": "video/x-ms-wmv",
+    "flv": "video/x-flv",
+    "mkv": "video/x-matroska",
     // Audio
-    'mp3': 'audio/mpeg',
-    'wav': 'audio/wav',
-    'flac': 'audio/flac',
-    'ogg': 'audio/ogg',
-    'aac': 'audio/aac',
-    'm4a': 'audio/mp4',
-    'opus': 'audio/opus',
-    'wma': 'audio/x-ms-wma',
+    "mp3": "audio/mpeg",
+    "wav": "audio/wav",
+    "flac": "audio/flac",
+    "ogg": "audio/ogg",
+    "aac": "audio/aac",
+    "m4a": "audio/mp4",
+    "opus": "audio/opus",
+    "wma": "audio/x-ms-wma",
     // Documents
-    'pdf': 'application/pdf',
-    'doc': 'application/msword',
-    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'xls': 'application/vnd.ms-excel',
-    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'ppt': 'application/vnd.ms-powerpoint',
-    'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    "pdf": "application/pdf",
+    "doc": "application/msword",
+    "docx":
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xls": "application/vnd.ms-excel",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "ppt": "application/vnd.ms-powerpoint",
+    "pptx":
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     // Archives
-    'zip': 'application/zip',
-    'rar': 'application/vnd.rar',
-    '7z': 'application/x-7z-compressed',
-    'tar': 'application/x-tar',
-    'gz': 'application/gzip',
+    "zip": "application/zip",
+    "rar": "application/vnd.rar",
+    "7z": "application/x-7z-compressed",
+    "tar": "application/x-tar",
+    "gz": "application/gzip",
   };
-  return mimeTypes[extension] || 'application/octet-stream';
+  return mimeTypes[extension] || "application/octet-stream";
 };
 
 // PDF viewer component
@@ -143,18 +171,20 @@ const PdfViewer = ({ blobData }: { blobData: string }) => {
       src={blobData}
       width="100%"
       height="600px"
-      style={{ border: 'none' }}
+      style={{ border: "none" }}
       title="PDF Preview"
     />
   );
 };
 
 // Video viewer component
-const VideoViewer = ({ blobData, contentType }: { blobData: string; contentType: string }) => {
+const VideoViewer = (
+  { blobData, contentType }: { blobData: string; contentType: string },
+) => {
   return (
     <video
       controls
-      style={{ width: '100%', maxHeight: '600px' }}
+      style={{ width: "100%", maxHeight: "600px" }}
       className="rounded-lg"
     >
       <source src={blobData} type={contentType} />
@@ -164,7 +194,9 @@ const VideoViewer = ({ blobData, contentType }: { blobData: string; contentType:
 };
 
 // Audio viewer component
-const AudioViewer = ({ blobData, contentType }: { blobData: string; contentType: string }) => {
+const AudioViewer = (
+  { blobData, contentType }: { blobData: string; contentType: string },
+) => {
   return (
     <div className="flex items-center justify-center p-8">
       <audio controls className="w-full max-w-md">
@@ -203,7 +235,8 @@ export function MediaViewer({
   const blobManager = BlobManager.getInstance();
 
   const user = state.user;
-  const canEdit = !readOnlyMode && user && file && hasWriteAccess(user.publicKey, user.capabilities || [], file.path);
+  const canEdit = !readOnlyMode && user && file &&
+    hasWriteAccess(user.publicKey, user.capabilities || [], file.path);
 
   // Load file and metadata from path
   useEffect(() => {
@@ -241,12 +274,12 @@ export function MediaViewer({
           if (blobContent) {
             // This is a direct blob file, detect content type from file extension first, then from content
             let contentType = getContentTypeFromExtension(fileName);
-            
+
             // If extension didn't give us a good content type, try to detect from blob content
-            if (contentType === 'application/octet-stream') {
+            if (contentType === "application/octet-stream") {
               contentType = detectContentTypeFromBlob(blobContent);
             }
-            
+
             const directMetadata: BlobMetadata = {
               name: fileName,
               content_type: contentType,
@@ -255,7 +288,7 @@ export function MediaViewer({
               created_at: Date.now(),
             };
             setMetadata(directMetadata);
-            
+
             // Since we already have the blob data, convert it to display URL immediately
             const buffer = new ArrayBuffer(blobContent.length);
             const view = new Uint8Array(buffer);
@@ -270,7 +303,9 @@ export function MediaViewer({
           console.debug("Not a blob file either...");
         }
 
-        showError("File is neither valid blob metadata nor a direct media file");
+        showError(
+          "File is neither valid blob metadata nor a direct media file",
+        );
       } catch (error) {
         console.error("Error loading file:", error);
         showError("Failed to load file");
@@ -284,7 +319,7 @@ export function MediaViewer({
 
   const loadBlobData = useCallback(async () => {
     if (!metadata) return;
-    
+
     // If we already have blob data (from direct blob loading), don't reload
     if (blobData) return;
 
@@ -324,7 +359,7 @@ export function MediaViewer({
   // Clean up blob URLs on unmount
   useEffect(() => {
     return () => {
-      if (blobData && blobData.startsWith('blob:')) {
+      if (blobData && blobData.startsWith("blob:")) {
         URL.revokeObjectURL(blobData);
       }
     };
@@ -367,7 +402,7 @@ export function MediaViewer({
 
     const contentType = metadata.content_type.toLowerCase();
 
-    if (contentType.startsWith('image/')) {
+    if (contentType.startsWith("image/")) {
       return (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -379,25 +414,27 @@ export function MediaViewer({
       );
     }
 
-    if (contentType.startsWith('video/')) {
+    if (contentType.startsWith("video/")) {
       return <VideoViewer blobData={blobData} contentType={contentType} />;
     }
 
-    if (contentType.startsWith('audio/')) {
+    if (contentType.startsWith("audio/")) {
       return <AudioViewer blobData={blobData} contentType={contentType} />;
     }
 
-    if (contentType === 'application/pdf') {
+    if (contentType === "application/pdf") {
       return <PdfViewer blobData={blobData} />;
     }
 
     // For document types, show info and download option
-    if (contentType.includes('word') || 
-        contentType.includes('excel') || 
-        contentType.includes('powerpoint') ||
-        contentType.includes('spreadsheet') ||
-        contentType.includes('presentation') ||
-        contentType.includes('document')) {
+    if (
+      contentType.includes("word") ||
+      contentType.includes("excel") ||
+      contentType.includes("powerpoint") ||
+      contentType.includes("spreadsheet") ||
+      contentType.includes("presentation") ||
+      contentType.includes("document")
+    ) {
       return (
         <div className="flex flex-col items-center justify-center p-8 text-gray-600 space-y-4">
           <FileText className="h-16 w-16 text-blue-400" />
@@ -423,11 +460,13 @@ export function MediaViewer({
     }
 
     // For archive types
-    if (contentType.includes('zip') || 
-        contentType.includes('rar') || 
-        contentType.includes('7z') ||
-        contentType.includes('tar') ||
-        contentType.includes('gzip')) {
+    if (
+      contentType.includes("zip") ||
+      contentType.includes("rar") ||
+      contentType.includes("7z") ||
+      contentType.includes("tar") ||
+      contentType.includes("gzip")
+    ) {
       return (
         <div className="flex flex-col items-center justify-center p-8 text-gray-600 space-y-4">
           <FileText className="h-16 w-16 text-orange-400" />
@@ -481,10 +520,14 @@ export function MediaViewer({
     if (!metadata) return <FileText className="h-4 w-4" />;
 
     const contentType = metadata.content_type.toLowerCase();
-    if (contentType.startsWith('image/')) return <ImageIcon className="h-4 w-4" />;
-    if (contentType.startsWith('video/')) return <Video className="h-4 w-4" />;
-    if (contentType.startsWith('audio/')) return <Video className="h-4 w-4" />;
-    if (contentType === 'application/pdf') return <FileText className="h-4 w-4" />;
+    if (contentType.startsWith("image/")) {
+      return <ImageIcon className="h-4 w-4" />;
+    }
+    if (contentType.startsWith("video/")) return <Video className="h-4 w-4" />;
+    if (contentType.startsWith("audio/")) return <Video className="h-4 w-4" />;
+    if (contentType === "application/pdf") {
+      return <FileText className="h-4 w-4" />;
+    }
     return <FileText className="h-4 w-4" />;
   };
 
@@ -572,7 +615,7 @@ export function MediaViewer({
                   <Download className="h-4 w-4 mr-2" />
                   Download
                 </Button>
-                
+
                 {canEdit && (
                   <Button onClick={handleEditFile} variant="outline">
                     <Edit className="h-4 w-4 mr-2" />
@@ -613,7 +656,9 @@ export function MediaViewer({
                     <span className="text-gray-600 dark:text-gray-400">
                       Created:
                     </span>
-                    <span>{new Date(metadata.created_at).toLocaleString()}</span>
+                    <span>
+                      {new Date(metadata.created_at).toLocaleString()}
+                    </span>
                   </div>
                 </div>
               </div>

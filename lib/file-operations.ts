@@ -318,7 +318,10 @@ export class FileOperations {
   /**
    * Create a binary file (e.g., images, blobs)
    */
-  public async createBinaryFile(filePath: string, data: Uint8Array): Promise<boolean> {
+  public async createBinaryFile(
+    filePath: string,
+    data: Uint8Array,
+  ): Promise<boolean> {
     try {
       const success = await this.pubkyClient.put(filePath, data);
 
@@ -360,7 +363,10 @@ export class FileOperations {
   /**
    * Update a binary file
    */
-  public async updateBinaryFile(filePath: string, data: Uint8Array): Promise<boolean> {
+  public async updateBinaryFile(
+    filePath: string,
+    data: Uint8Array,
+  ): Promise<boolean> {
     try {
       const success = await this.pubkyClient.put(filePath, data);
       return success;

@@ -30,7 +30,7 @@ interface SyntaxHighlighterProps {
 const getLanguage = (fileExtension: string): string => {
   const extensionMap: { [key: string]: string } = {
     ".js": "javascript",
-    ".mjs": "javascript", 
+    ".mjs": "javascript",
     ".jsx": "jsx",
     ".ts": "typescript",
     ".tsx": "tsx",
@@ -54,11 +54,11 @@ const getLanguage = (fileExtension: string): string => {
   return extensionMap[fileExtension.toLowerCase()] || "plain";
 };
 
-export function SyntaxHighlighter({ 
-  code, 
-  language, 
-  className = "", 
-  showLineNumbers = true 
+export function SyntaxHighlighter({
+  code,
+  language,
+  className = "",
+  showLineNumbers = true,
 }: SyntaxHighlighterProps) {
   useEffect(() => {
     Prism.highlightAll();
@@ -68,7 +68,7 @@ export function SyntaxHighlighter({
 
   return (
     <div className={`relative ${className}`}>
-      <pre 
+      <pre
         className={`
           ${showLineNumbers ? "line-numbers" : ""} 
           !bg-gray-900 !text-gray-100 
@@ -76,11 +76,11 @@ export function SyntaxHighlighter({
           text-sm
           max-h-96
         `}
-        style={{ 
+        style={{
           margin: 0,
           padding: "1rem",
           whiteSpace: "pre-wrap",
-          wordBreak: "break-word"
+          wordBreak: "break-word",
         }}
       >
         <code className={`language-${prismLanguage}`}>

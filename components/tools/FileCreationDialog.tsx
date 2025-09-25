@@ -30,7 +30,9 @@ export function FileCreationDialog({
   onCancel,
 }: FileCreationDialogProps) {
   const { showSuccess, showError } = useToast();
-  const [createType, setCreateType] = useState<FileCreateOptions["type"] | null>(null);
+  const [createType, setCreateType] = useState<
+    FileCreateOptions["type"] | null
+  >(null);
   const [fileName, setFileName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -48,7 +50,7 @@ export function FileCreationDialog({
     try {
       const filePath = `${currentPath}/${fileName}`;
       const success = await fileOps.createFile(filePath, "");
-      
+
       if (success) {
         showSuccess(`File "${fileName}" created successfully`);
         onFileCreated();
@@ -69,14 +71,16 @@ export function FileCreationDialog({
       return;
     }
 
-    const finalName = fileName.endsWith('.json') ? fileName : `${fileName}.json`;
-    
+    const finalName = fileName.endsWith(".json")
+      ? fileName
+      : `${fileName}.json`;
+
     setIsCreating(true);
     try {
       const filePath = `${currentPath}/${finalName}`;
       const defaultJson = JSON.stringify({}, null, 2);
       const success = await fileOps.createFile(filePath, defaultJson);
-      
+
       if (success) {
         showSuccess(`JSON file "${finalName}" created successfully`);
         onFileCreated();
@@ -101,7 +105,7 @@ export function FileCreationDialog({
     try {
       const folderPath = `${currentPath}/${fileName}`;
       const success = await fileOps.createDirectory(folderPath);
-      
+
       if (success) {
         showSuccess(`Folder "${fileName}" created successfully`);
         onFileCreated();
@@ -120,7 +124,7 @@ export function FileCreationDialog({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith("image/")) {
       showError("Only image files are supported for blob upload");
       return;
     }
@@ -129,9 +133,9 @@ export function FileCreationDialog({
     try {
       // Extract the base path for pubky structure
       const basePath = currentPath.replace(`pubky://${userPublicKey}`, "");
-      
+
       await blobManager.uploadImage(file, basePath, userPublicKey);
-      
+
       showSuccess(`Image "${file.name}" uploaded successfully`);
       onFileCreated();
     } catch (error) {
@@ -148,41 +152,41 @@ export function FileCreationDialog({
 
   const getActionButton = () => {
     switch (createType) {
-      case 'text':
+      case "text":
         return (
-          <Button 
-            onClick={handleCreateText} 
-            size="sm" 
+          <Button
+            onClick={handleCreateText}
+            size="sm"
             disabled={isCreating || !fileName.trim()}
           >
             {isCreating ? "Creating..." : "Create Text File"}
           </Button>
         );
-      case 'json':
+      case "json":
         return (
-          <Button 
-            onClick={handleCreateJson} 
-            size="sm" 
+          <Button
+            onClick={handleCreateJson}
+            size="sm"
             disabled={isCreating || !fileName.trim()}
           >
             {isCreating ? "Creating..." : "Create JSON File"}
           </Button>
         );
-      case 'folder':
+      case "folder":
         return (
-          <Button 
-            onClick={handleCreateFolder} 
-            size="sm" 
+          <Button
+            onClick={handleCreateFolder}
+            size="sm"
             disabled={isCreating || !fileName.trim()}
           >
             {isCreating ? "Creating..." : "Create Folder"}
           </Button>
         );
-      case 'image':
+      case "image":
         return (
-          <Button 
-            onClick={() => fileInputRef.current?.click()} 
-            size="sm" 
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            size="sm"
             disabled={isCreating}
             className="flex items-center gap-2"
           >
@@ -204,53 +208,61 @@ export function FileCreationDialog({
             <X className="h-4 w-4" />
           </Button>
         </div>
-        
+
         <div className="grid grid-cols-2 gap-2">
           <Button
             variant="outline"
-            onClick={() => setCreateType('text')}
+            onClick={() => setCreateType("text")}
             className="flex items-center gap-2 h-auto p-3"
           >
             <Type className="h-5 w-5" />
             <div className="text-left">
               <div className="font-medium">Text File</div>
-              <div className="text-xs text-muted-foreground">Create a plain text file</div>
+              <div className="text-xs text-muted-foreground">
+                Create a plain text file
+              </div>
             </div>
           </Button>
-          
+
           <Button
             variant="outline"
-            onClick={() => setCreateType('json')}
+            onClick={() => setCreateType("json")}
             className="flex items-center gap-2 h-auto p-3"
           >
             <File className="h-5 w-5" />
             <div className="text-left">
               <div className="font-medium">JSON File</div>
-              <div className="text-xs text-muted-foreground">Create a JSON data file</div>
+              <div className="text-xs text-muted-foreground">
+                Create a JSON data file
+              </div>
             </div>
           </Button>
-          
+
           <Button
             variant="outline"
-            onClick={() => setCreateType('folder')}
+            onClick={() => setCreateType("folder")}
             className="flex items-center gap-2 h-auto p-3"
           >
             <FolderPlus className="h-5 w-5" />
             <div className="text-left">
               <div className="font-medium">Folder</div>
-              <div className="text-xs text-muted-foreground">Create a new directory</div>
+              <div className="text-xs text-muted-foreground">
+                Create a new directory
+              </div>
             </div>
           </Button>
-          
+
           <Button
             variant="outline"
-            onClick={() => setCreateType('image')}
+            onClick={() => setCreateType("image")}
             className="flex items-center gap-2 h-auto p-3"
           >
             <ImageIcon className="h-5 w-5" />
             <div className="text-left">
               <div className="font-medium">Image</div>
-              <div className="text-xs text-muted-foreground">Upload an image as blob</div>
+              <div className="text-xs text-muted-foreground">
+                Upload an image as blob
+              </div>
             </div>
           </Button>
         </div>
@@ -262,71 +274,80 @@ export function FileCreationDialog({
     <div className="p-4 border rounded-md bg-muted/30">
       <div className="flex justify-between items-center mb-3">
         <h3 className="font-medium">
-          Create {createType === 'text' ? 'Text File' : 
-                 createType === 'json' ? 'JSON File' :
-                 createType === 'folder' ? 'Folder' : 'Image Upload'}
+          Create {createType === "text"
+            ? "Text File"
+            : createType === "json"
+            ? "JSON File"
+            : createType === "folder"
+            ? "Folder"
+            : "Image Upload"}
         </h3>
         <Button variant="ghost" size="sm" onClick={onCancel}>
           <X className="h-4 w-4" />
         </Button>
       </div>
 
-      {createType !== 'image' ? (
-        <div className="space-y-3">
-          <Input
-            placeholder={
-              createType === 'folder' 
-                ? "Enter folder name" 
-                : `Enter file name${createType === 'json' ? ' (e.g., data.json)' : ' (e.g., document.txt)'}`
-            }
-            value={fileName}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setFileName(e.target.value)}
-            onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
-              if (e.key === "Enter" && fileName.trim() && !isCreating) {
-                if (createType === 'text') handleCreateText();
-                else if (createType === 'json') handleCreateJson();
-                else if (createType === 'folder') handleCreateFolder();
-              }
-            }}
-            disabled={isCreating}
-          />
-          <div className="flex space-x-2">
-            {getActionButton()}
-            <Button
-              variant="outline"
-              onClick={() => setCreateType(null)}
-              size="sm"
+      {createType !== "image"
+        ? (
+          <div className="space-y-3">
+            <Input
+              placeholder={createType === "folder"
+                ? "Enter folder name"
+                : `Enter file name${
+                  createType === "json"
+                    ? " (e.g., data.json)"
+                    : " (e.g., document.txt)"
+                }`}
+              value={fileName}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setFileName(e.target.value)}
+              onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
+                if (e.key === "Enter" && fileName.trim() && !isCreating) {
+                  if (createType === "text") handleCreateText();
+                  else if (createType === "json") handleCreateJson();
+                  else if (createType === "folder") handleCreateFolder();
+                }
+              }}
               disabled={isCreating}
-            >
-              Back
-            </Button>
+            />
+            <div className="flex space-x-2">
+              {getActionButton()}
+              <Button
+                variant="outline"
+                onClick={() => setCreateType(null)}
+                size="sm"
+                disabled={isCreating}
+              >
+                Back
+              </Button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="text-sm text-muted-foreground">
-            Select an image file to upload as a blob with metadata.
+        )
+        : (
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              Select an image file to upload as a blob with metadata.
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <div className="flex space-x-2">
+              {getActionButton()}
+              <Button
+                variant="outline"
+                onClick={() => setCreateType(null)}
+                size="sm"
+                disabled={isCreating}
+              >
+                Back
+              </Button>
+            </div>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-          <div className="flex space-x-2">
-            {getActionButton()}
-            <Button
-              variant="outline"
-              onClick={() => setCreateType(null)}
-              size="sm"
-              disabled={isCreating}
-            >
-              Back
-            </Button>
-          </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }

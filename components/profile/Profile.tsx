@@ -283,7 +283,8 @@ export default function Profile() {
           </div>
 
           {/* Homeserver */}
-          {/* <div className="space-y-2">
+          {
+            /* <div className="space-y-2">
             <label className="block text-sm font-medium text-foreground">
               <Server className="inline h-4 w-4 mr-1" />
               Homeserver
@@ -308,7 +309,8 @@ export default function Profile() {
                 </Button>
               )}
             </div>
-          </div> */}
+          </div> */
+          }
         </CardContent>
       </Card>
 

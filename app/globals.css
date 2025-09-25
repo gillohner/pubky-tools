@@ -24,17 +24,17 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
-    
+
     /* Component scaling variables */
     --breadcrumb-height: 1.5rem; /* 24px mobile */
     --breadcrumb-text: 0.75rem; /* 12px mobile */
     --breadcrumb-padding: 0.5rem; /* 8px mobile */
     --breadcrumb-max-width: 8rem; /* 128px mobile */
-    
+
     --button-height: 2rem; /* 32px mobile */
     --button-text: 0.875rem; /* 14px mobile */
     --button-padding: 0.5rem; /* 8px mobile */
-    
+
     --input-height: 2rem; /* 32px mobile */
     --input-text: 0.875rem; /* 14px mobile */
     --input-padding: 0.5rem; /* 8px mobile */
@@ -61,7 +61,7 @@
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 94.1%;
   }
-  
+
   /* Desktop scaling overrides */
   @media (min-width: 768px) {
     :root {
@@ -69,11 +69,11 @@
       --breadcrumb-text: 0.875rem; /* 14px desktop */
       --breadcrumb-padding: 0.75rem; /* 12px desktop */
       --breadcrumb-max-width: 10rem; /* 160px desktop */
-      
+
       --button-height: 2.25rem; /* 36px desktop */
       --button-text: 0.875rem; /* 14px desktop */
       --button-padding: 0.75rem; /* 12px desktop */
-      
+
       --input-height: 2.25rem; /* 36px desktop */
       --input-text: 0.875rem; /* 14px desktop */
       --input-padding: 0.75rem; /* 12px desktop */

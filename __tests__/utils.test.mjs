@@ -36,7 +36,7 @@ function isTextFile(filename) {
 }
 
 function getFullFilePath(currentFile, filePath) {
-  return currentFile?.path || filePath || '';
+  return currentFile?.path || filePath || "";
 }
 
 function getFileName(currentFile, filePath, defaultName = "untitled") {
@@ -125,29 +125,41 @@ describe("Utils", () => {
     it("should return currentFile.path when available", () => {
       const currentFile = { path: "pubky://user123/pub/documents/test.txt" };
       const filePath = "pubky://user123/pub/backup.txt";
-      assert.strictEqual(getFullFilePath(currentFile, filePath), "pubky://user123/pub/documents/test.txt");
+      assert.strictEqual(
+        getFullFilePath(currentFile, filePath),
+        "pubky://user123/pub/documents/test.txt",
+      );
     });
 
     it("should return filePath when currentFile is null", () => {
       const filePath = "pubky://user123/pub/backup.txt";
-      assert.strictEqual(getFullFilePath(null, filePath), "pubky://user123/pub/backup.txt");
+      assert.strictEqual(
+        getFullFilePath(null, filePath),
+        "pubky://user123/pub/backup.txt",
+      );
     });
 
     it("should return filePath when currentFile is undefined", () => {
       const filePath = "pubky://user123/pub/backup.txt";
-      assert.strictEqual(getFullFilePath(undefined, filePath), "pubky://user123/pub/backup.txt");
+      assert.strictEqual(
+        getFullFilePath(undefined, filePath),
+        "pubky://user123/pub/backup.txt",
+      );
     });
 
     it("should return empty string when both currentFile and filePath are missing", () => {
-      assert.strictEqual(getFullFilePath(null, null), '');
-      assert.strictEqual(getFullFilePath(undefined, undefined), '');
-      assert.strictEqual(getFullFilePath(), '');
+      assert.strictEqual(getFullFilePath(null, null), "");
+      assert.strictEqual(getFullFilePath(undefined, undefined), "");
+      assert.strictEqual(getFullFilePath(), "");
     });
 
     it("should prioritize currentFile.path over filePath", () => {
       const currentFile = { path: "pubky://user123/pub/current.txt" };
       const filePath = "pubky://user123/pub/fallback.txt";
-      assert.strictEqual(getFullFilePath(currentFile, filePath), "pubky://user123/pub/current.txt");
+      assert.strictEqual(
+        getFullFilePath(currentFile, filePath),
+        "pubky://user123/pub/current.txt",
+      );
     });
   });
 
@@ -172,8 +184,14 @@ describe("Utils", () => {
     });
 
     it("should use custom default name", () => {
-      assert.strictEqual(getFileName(null, null, "new-file.txt"), "new-file.txt");
-      assert.strictEqual(getFileName(undefined, undefined, "custom.md"), "custom.md");
+      assert.strictEqual(
+        getFileName(null, null, "new-file.txt"),
+        "new-file.txt",
+      );
+      assert.strictEqual(
+        getFileName(undefined, undefined, "custom.md"),
+        "custom.md",
+      );
     });
 
     it("should prioritize currentFile.name over filePath", () => {

@@ -2,6 +2,17 @@
 applyTo: "**"
 ---
 
+# Always make sure following commands run without any error before terminating a conversation:
+
+npm run lint
+npm run build
+npm run test
+
+# Always make sure code is formatted with deno fmt before terminating a conversation. Project is not a deno project, but deno fmt is used for formatting (not for linting)
+deno fmt
+
+# Always make sure to add tests to my code if I added new features or fixed bugs. Also when editing existing code, make sure existing tests are not broken and add tests if necessary even if no Tests are existing for that file yet.
+
 https://www.npmjs.com/package/@synonymdev/pubky Pubky
 
 JavaScript implementation of Pubky client. Table of Contents

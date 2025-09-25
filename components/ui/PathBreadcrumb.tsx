@@ -18,16 +18,16 @@ interface PathBreadcrumbProps {
   directEditing?: boolean; // New prop for direct editing without edit button
 }
 
-export function PathBreadcrumb({ 
-  path, 
-  onNavigate, 
+export function PathBreadcrumb({
+  path,
+  onNavigate,
   className = "",
   showCopyButton = true,
   maxLength = 80,
   showDefaultText = false,
   defaultText = "Click to navigate or search...",
   context = "browser",
-  directEditing = false
+  directEditing = false,
 }: PathBreadcrumbProps) {
   const { showSuccess } = useToast();
   const [isEditing, setIsEditing] = useState(false);
@@ -43,7 +43,7 @@ export function PathBreadcrumb({
 
   const getContextualDefaultText = () => {
     if (defaultText !== "Click to navigate or search...") return defaultText;
-    
+
     switch (context) {
       case "browser":
         return "Enter pubky:// URL, pk:user123..., or /path to navigate";
@@ -56,20 +56,25 @@ export function PathBreadcrumb({
     }
   };
 
-  const getPathSegments = useCallback((): { segments: string[]; originalSegments: string[] } => {
-    if (!path || !path.startsWith("pubky://")) return { segments: [], originalSegments: [] };
-    
-    // Remove pubky:// prefix and split by /
-    const cleanPath = path.replace("pubky://", "");
-    const originalSegments = cleanPath.split("/").filter(Boolean);
-    
-    // Remove /pub from display - treat it as root
-    const segments = originalSegments.filter((segment, index) => {
-      return !(index === 1 && segment === "pub");
-    });
-    
-    return { segments, originalSegments };
-  }, [path]);
+  const getPathSegments = useCallback(
+    (): { segments: string[]; originalSegments: string[] } => {
+      if (!path || !path.startsWith("pubky://")) {
+        return { segments: [], originalSegments: [] };
+      }
+
+      // Remove pubky:// prefix and split by /
+      const cleanPath = path.replace("pubky://", "");
+      const originalSegments = cleanPath.split("/").filter(Boolean);
+
+      // Remove /pub from display - treat it as root
+      const segments = originalSegments.filter((segment, index) => {
+        return !(index === 1 && segment === "pub");
+      });
+
+      return { segments, originalSegments };
+    },
+    [path],
+  );
 
   const handleCopyPath = useCallback(() => {
     navigator.clipboard.writeText(path).then(() => {
@@ -90,7 +95,7 @@ export function PathBreadcrumb({
 
     // Clean up the input value
     const cleanValue = editValue.trim();
-    
+
     if (!cleanValue) {
       setIsEditing(false);
       return;
@@ -111,7 +116,9 @@ export function PathBreadcrumb({
       const pathData = getPathSegments();
       if (pathData.originalSegments.length > 0) {
         const userKey = pathData.originalSegments[0];
-        targetPath = `pubky://${userKey}${cleanValue.startsWith("/pub/") ? cleanValue : "/pub" + cleanValue}`;
+        targetPath = `pubky://${userKey}${
+          cleanValue.startsWith("/pub/") ? cleanValue : "/pub" + cleanValue
+        }`;
         if (!targetPath.endsWith("/")) targetPath += "/";
       }
     } else {
@@ -129,9 +136,9 @@ export function PathBreadcrumb({
   }, []);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleEditSubmit();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       handleEditCancel();
     }
   }, [handleEditSubmit, handleEditCancel]);
@@ -154,10 +161,10 @@ export function PathBreadcrumb({
 
   const formatDisplayPath = () => {
     if (path.length <= maxLength) return path;
-    
+
     const { segments } = getPathSegments();
     if (segments.length <= 2) return path;
-    
+
     // For mobile: show end of path, hide public key if needed
     const lastSegments = segments.slice(-3); // Show last 3 segments
     return `.../${lastSegments.join("/")}`;
@@ -170,7 +177,9 @@ export function PathBreadcrumb({
   if (showDefaultText && (!path || !path.startsWith("pubky://"))) {
     if (directEditing) {
       return (
-        <div className={`flex items-center min-w-0 bg-muted/50 rounded-lg p-2 ${className}`}>
+        <div
+          className={`flex items-center min-w-0 bg-muted/50 rounded-lg p-2 ${className}`}
+        >
           <SearchInput
             ref={inputRef}
             value={editValue}
@@ -189,9 +198,9 @@ export function PathBreadcrumb({
         </div>
       );
     }
-    
+
     return (
-      <div 
+      <div
         className={`flex items-center min-w-0 bg-muted/50 rounded-lg p-3 cursor-pointer hover:bg-muted/70 transition-colors ${className}`}
         onClick={() => {
           setEditValue(path || "");
@@ -208,7 +217,9 @@ export function PathBreadcrumb({
   // Edit mode
   if (isEditing) {
     return (
-      <div className={`flex items-center min-w-0 bg-muted/50 rounded-lg p-2 ${className}`}>
+      <div
+        className={`flex items-center min-w-0 bg-muted/50 rounded-lg p-2 ${className}`}
+      >
         <SearchInput
           ref={inputRef}
           value={editValue}
@@ -224,12 +235,16 @@ export function PathBreadcrumb({
   }
 
   return (
-    <div 
-      className={`flex items-center min-w-0 bg-muted/50 rounded-lg p-breadcrumb-p ${className} ${directEditing ? 'cursor-text' : ''}`}
-      onClick={directEditing ? () => {
-        setEditValue(path);
-        setIsEditing(true);
-      } : undefined}
+    <div
+      className={`flex items-center min-w-0 bg-muted/50 rounded-lg p-breadcrumb-p ${className} ${
+        directEditing ? "cursor-text" : ""
+      }`}
+      onClick={directEditing
+        ? () => {
+          setEditValue(path);
+          setIsEditing(true);
+        }
+        : undefined}
       title={directEditing ? "Click to edit path" : undefined}
     >
       <div className="flex items-center min-w-0 flex-1">
@@ -272,49 +287,59 @@ export function PathBreadcrumb({
 
         {/* Desktop/Tablet view - show breadcrumb segments as colored bubbles */}
         <div className="hidden sm:flex items-center min-w-0 flex-1 overflow-hidden gap-1">
-          {directEditing ? (
-            <div className="flex-1 min-w-0">
-              <div className="text-breadcrumb text-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:underline px-2 py-1 rounded min-w-0 truncate">
-                {segments.length > 0 ? segments.join(" / ") : "Click to edit"}
+          {directEditing
+            ? (
+              <div className="flex-1 min-w-0">
+                <div className="text-breadcrumb text-foreground hover:text-blue-600 dark:hover:text-blue-400 hover:underline px-2 py-1 rounded min-w-0 truncate">
+                  {segments.length > 0 ? segments.join(" / ") : "Click to edit"}
+                </div>
               </div>
-            </div>
-          ) : (
-            segments.map((segment: string, index: number) => {
-              // Skip the ellipsis indicator for mobile smart truncation
-              if (segment === '...') {
+            )
+            : (
+              segments.map((segment: string, index: number) => {
+                // Skip the ellipsis indicator for mobile smart truncation
+                if (segment === "...") {
+                  return (
+                    <div key={index} className="flex items-center min-w-0">
+                      <span className="text-gray-400 px-1">...</span>
+                      {index < segments.length - 1 && (
+                        <ChevronRight className="h-3 w-3 text-gray-400 mx-1 flex-shrink-0" />
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={index} className="flex items-center min-w-0">
-                    <span className="text-gray-400 px-1">...</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onNavigate) {
+                          onNavigate(buildPathUpTo(index));
+                        }
+                      }}
+                      className="px-breadcrumb-p py-1 h-breadcrumb-h min-w-0 max-w-breadcrumb bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 truncate text-breadcrumb"
+                      title={`Navigate to: ${segment}`}
+                    >
+                      {index === 0
+                        ? truncateSegment(
+                          segment,
+                          typeof window !== "undefined" &&
+                            window.innerWidth < 768
+                            ? 10
+                            : 20,
+                        )
+                        : segment}
+                    </Button>
                     {index < segments.length - 1 && (
                       <ChevronRight className="h-3 w-3 text-gray-400 mx-1 flex-shrink-0" />
                     )}
                   </div>
                 );
-              }
-              
-              return (
-                <div key={index} className="flex items-center min-w-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (onNavigate) {
-                        onNavigate(buildPathUpTo(index));
-                      }
-                    }}
-                    className="px-breadcrumb-p py-1 h-breadcrumb-h min-w-0 max-w-breadcrumb bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 truncate text-breadcrumb"
-                    title={`Navigate to: ${segment}`}
-                  >
-                    {index === 0 ? truncateSegment(segment, typeof window !== 'undefined' && window.innerWidth < 768 ? 10 : 20) : segment}
-                  </Button>
-                  {index < segments.length - 1 && (
-                    <ChevronRight className="h-3 w-3 text-gray-400 mx-1 flex-shrink-0" />
-                  )}
-                </div>
-              );
-            })
-          )}
+              })
+            )}
         </div>
       </div>
 

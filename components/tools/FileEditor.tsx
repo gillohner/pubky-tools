@@ -8,11 +8,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { FileOperations } from "@/lib/file-operations";
 import { FileSchema, PubkyFile } from "@/types/index";
-import { getFileExtension, hasWriteAccess, isOwnPath, getFullFilePath, getFileName } from "@/lib/utils";
+import {
+  getFileExtension,
+  getFileName,
+  getFullFilePath,
+  hasWriteAccess,
+  isOwnPath,
+} from "@/lib/utils";
 import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
 import { NavigationHeader } from "@/components/ui/NavigationHeader";
-import { SyntaxHighlighter, getLanguage } from "@/components/ui/SyntaxHighlighter";
+import {
+  getLanguage,
+  SyntaxHighlighter,
+} from "@/components/ui/SyntaxHighlighter";
 import {
   AlertCircle,
   CheckCircle,
@@ -184,7 +193,14 @@ const FILE_SCHEMAS: { [key: string]: FileSchema } = {
 };
 
 export function FileEditor(
-  { file, initialPath, onFileChange, readOnlyMode = false, onBackToBrowser, onNavigateToPath }: FileEditorProps,
+  {
+    file,
+    initialPath,
+    onFileChange,
+    readOnlyMode = false,
+    onBackToBrowser,
+    onNavigateToPath,
+  }: FileEditorProps,
 ) {
   const { state } = useAuth();
   const { showSuccess, showError } = useToast();
@@ -440,13 +456,15 @@ export function FileEditor(
       {!isFullscreen && (
         <NavigationHeader
           path={fullFilePath} // Show full file path for editing
-          onNavigate={onNavigateToPath || onBackToBrowser ? (path) => {
-            if (onNavigateToPath) {
-              onNavigateToPath(path);
-            } else if (onBackToBrowser) {
-              onBackToBrowser();
+          onNavigate={onNavigateToPath || onBackToBrowser
+            ? (path) => {
+              if (onNavigateToPath) {
+                onNavigateToPath(path);
+              } else if (onBackToBrowser) {
+                onBackToBrowser();
+              }
             }
-          } : undefined}
+            : undefined}
           showBackButton={!!onBackToBrowser}
           onBack={onBackToBrowser}
           backButtonText="Back to Browser"
@@ -578,19 +596,15 @@ export function FileEditor(
                   disabled={!canWrite}
                   aria-pressed={isEditMode}
                   aria-label={isEditMode ? "Stop editing" : "Start editing"}
-                  title={
-                  !canWrite
+                  title={!canWrite
                     ? "View-only mode (no write access)"
                     : isEditMode
                     ? "Stop editing"
-                    : "Start editing"
-                  }
+                    : "Start editing"}
                 >
-                  {isEditMode ? (
-                  <FileText className="h-4 w-4" />
-                  ) : (
-                  <Edit className="h-4 w-4" />
-                  )}
+                  {isEditMode
+                    ? <FileText className="h-4 w-4" />
+                    : <Edit className="h-4 w-4" />}
                 </Button>
               )}
               <Button

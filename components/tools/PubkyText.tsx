@@ -8,14 +8,16 @@ interface PubkyTextProps {
   className?: string;
 }
 
-export function PubkyText({ text, onLinkClick, className = "" }: PubkyTextProps) {
+export function PubkyText(
+  { text, onLinkClick, className = "" }: PubkyTextProps,
+) {
   // Regex to match pubky:// URLs
   const pubkyUrlRegex = /(pubky:\/\/[a-zA-Z0-9]+[^\s]*)/g;
 
   const handleLinkClick = (event: MouseEvent<HTMLSpanElement>, url: string) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     if (onLinkClick) {
       onLinkClick(url);
     } else {
@@ -30,7 +32,7 @@ export function PubkyText({ text, onLinkClick, className = "" }: PubkyTextProps)
 
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
-      
+
       if (part.match(pubkyUrlRegex)) {
         // This is a pubky:// URL
         elements.push(
@@ -41,12 +43,12 @@ export function PubkyText({ text, onLinkClick, className = "" }: PubkyTextProps)
             title={onLinkClick ? "Click to navigate" : "Click to copy"}
           >
             {part}
-          </span>
+          </span>,
         );
       } else if (part) {
         // Regular text
         elements.push(
-          <span key={i}>{part}</span>
+          <span key={i}>{part}</span>,
         );
       }
     }
@@ -67,11 +69,15 @@ interface PubkyCodeBlockProps {
   className?: string;
 }
 
-export function PubkyCodeBlock({ code, onLinkClick, className = "" }: PubkyCodeBlockProps) {
-  const lines = code.split('\n');
+export function PubkyCodeBlock(
+  { code, onLinkClick, className = "" }: PubkyCodeBlockProps,
+) {
+  const lines = code.split("\n");
 
   return (
-    <pre className={`bg-gray-100 dark:bg-gray-800 rounded p-4 overflow-x-auto ${className}`}>
+    <pre
+      className={`bg-gray-100 dark:bg-gray-800 rounded p-4 overflow-x-auto ${className}`}
+    >
       <code>
         {lines.map((line, index) => (
           <div key={index} className="block">

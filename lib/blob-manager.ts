@@ -35,7 +35,9 @@ export class BlobManager {
     file: File,
     basePath: string,
     userPublicKey: string,
-  ): Promise<{ blobPath: string; metadataPath: string; metadata: BlobMetadata }> {
+  ): Promise<
+    { blobPath: string; metadataPath: string; metadata: BlobMetadata }
+  > {
     try {
       const blobId = this.generateBlobId();
       const timestamp = Date.now() * 1000; // Convert to microseconds
@@ -43,7 +45,8 @@ export class BlobManager {
       // Create paths
       const blobPath = `pubky://${userPublicKey}${basePath}/blobs/${blobId}`;
       const metadataId = this.generateBlobId();
-      const metadataPath = `pubky://${userPublicKey}${basePath}/files/${metadataId}`;
+      const metadataPath =
+        `pubky://${userPublicKey}${basePath}/files/${metadataId}`;
 
       // Create metadata
       const metadata: BlobMetadata = {
@@ -80,7 +83,9 @@ export class BlobManager {
   ): Promise<{ blobPath: string; metadata: BlobMetadata }> {
     try {
       // Read existing metadata
-      const existingMetadataJson = await this.fileOps.readFile(existingMetadataPath);
+      const existingMetadataJson = await this.fileOps.readFile(
+        existingMetadataPath,
+      );
       if (!existingMetadataJson) {
         throw new Error("Could not read existing metadata");
       }
@@ -96,7 +101,8 @@ export class BlobManager {
         .replace(`pubky://${userPublicKey}`, "")
         .replace(/\/files\/[^/]+$/, "");
 
-      const newBlobPath = `pubky://${userPublicKey}${basePath}/blobs/${newBlobId}`;
+      const newBlobPath =
+        `pubky://${userPublicKey}${basePath}/blobs/${newBlobId}`;
 
       // Create updated metadata
       const updatedMetadata: BlobMetadata = {
@@ -139,7 +145,7 @@ export class BlobManager {
   public parseBlobMetadata(jsonContent: string): BlobMetadata | null {
     try {
       const metadata = JSON.parse(jsonContent);
-      
+
       // Validate required fields
       if (
         typeof metadata.name === "string" &&
@@ -151,7 +157,7 @@ export class BlobManager {
       ) {
         return metadata as BlobMetadata;
       }
-      
+
       return null;
     } catch {
       return null;

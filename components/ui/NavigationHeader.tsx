@@ -8,21 +8,21 @@ interface NavigationHeaderProps {
   // Path and navigation
   path?: string;
   onNavigate?: (path: string) => void;
-  
+
   // Back button
   showBackButton?: boolean;
   onBack?: () => void;
   backButtonText?: string;
-  
+
   // File context (for file editor)
   fileName?: string;
   showFileName?: boolean;
-  
+
   // Styling and behavior
   context?: "browser" | "editor" | "image";
   className?: string;
   variant?: "default" | "muted" | "minimal";
-  
+
   // PathBreadcrumb props
   showCopyButton?: boolean;
   showDefaultText?: boolean;
@@ -58,7 +58,7 @@ export function NavigationHeader({
   };
 
   const hasContent = path || showBackButton || showFileName;
-  
+
   if (!hasContent) {
     return null;
   }
@@ -80,10 +80,10 @@ export function NavigationHeader({
             </Button>
           </div>
         )}
-        
+
         {path && (
           <div className="w-full">
-            <PathBreadcrumb 
+            <PathBreadcrumb
               path={path}
               onNavigate={onNavigate}
               className="w-full"
@@ -95,15 +95,17 @@ export function NavigationHeader({
             />
           </div>
         )}
-        
+
         {showFileName && fileName && (
           <div className="flex items-center space-x-1">
             <span className="text-muted-foreground text-sm">File:</span>
-            <span className="text-foreground font-medium text-sm break-all">{fileName}</span>
+            <span className="text-foreground font-medium text-sm break-all">
+              {fileName}
+            </span>
           </div>
         )}
       </div>
-      
+
       {/* Desktop layout - single line */}
       <div className="hidden md:flex md:items-center md:justify-between">
         <div className="flex items-center space-x-2 min-w-0 flex-1">
@@ -118,11 +120,13 @@ export function NavigationHeader({
               {backButtonText}
             </Button>
           )}
-          
+
           {path && (
             <>
-              {showBackButton && <span className="text-muted-foreground">•</span>}
-              <PathBreadcrumb 
+              {showBackButton && (
+                <span className="text-muted-foreground">•</span>
+              )}
+              <PathBreadcrumb
                 path={path}
                 onNavigate={onNavigate}
                 className="flex-1 min-w-0"
@@ -135,7 +139,9 @@ export function NavigationHeader({
               {showFileName && fileName && (
                 <>
                   <span className="text-muted-foreground">/</span>
-                  <span className="text-foreground font-medium flex-shrink-0">{fileName}</span>
+                  <span className="text-foreground font-medium flex-shrink-0">
+                    {fileName}
+                  </span>
                 </>
               )}
             </>
