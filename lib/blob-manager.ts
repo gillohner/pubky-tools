@@ -140,6 +140,60 @@ export class BlobManager {
   }
 
   /**
+   * Upload any file type and create both blob and metadata
+   */
+  public async uploadFile(
+    file: File,
+    basePath: string,
+    userPublicKey: string,
+  ): Promise<
+    { blobPath: string; metadataPath: string; metadata: BlobMetadata }
+  > {
+    try {
+      const blobId = this.generateBlobId();
+      const timestamp = Date.now() * 1000; // Convert to microseconds
+
+      // Create paths
+      const blobPath = `pubky://${userPublicKey}${basePath}/blobs/${blobId}`;
+      const metadataId = this.generateBlobId();
+      const metadataPath =
+        `pubky://${userPublicKey}${basePath}/files/${metadataId}`;
+
+      // Read file as binary data
+      const arrayBuffer = await file.arrayBuffer();
+      const binaryData = new Uint8Array(arrayBuffer);
+
+      // Create metadata
+      const metadata: BlobMetadata = {
+        name: file.name,
+        created_at: timestamp,
+        src: blobPath,
+        content_type: file.type || "application/octet-stream",
+        size: file.size,
+      };
+
+      // Upload blob data
+      const blobSuccess = await this.fileOps.createBinaryFile(
+        blobPath,
+        binaryData,
+      );
+      if (!blobSuccess) throw new Error("Failed to upload blob data");
+
+      // Upload metadata
+      const metadataSuccess = await this.fileOps.createFile(
+        metadataPath,
+        JSON.stringify(metadata, null, 2),
+      );
+      if (!metadataSuccess) throw new Error("Failed to create metadata");
+
+      return { blobPath, metadataPath, metadata };
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      throw new Error(`Failed to upload file: ${error}`);
+    }
+  }
+
+  /**
    * Parse blob metadata from JSON content
    */
   public parseBlobMetadata(jsonContent: string): BlobMetadata | null {

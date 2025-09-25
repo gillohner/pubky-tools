@@ -24,7 +24,9 @@ import {
 import { useToast } from "@/hooks/useToast";
 import { FileCreationDialog } from "@/components/tools/FileCreationDialog";
 import { PathBreadcrumb } from "@/components/ui/PathBreadcrumb";
+import { AlertDialog } from "@/components/ui/AlertDialog";
 import {
+  Archive,
   Download,
   Edit,
   File,
@@ -64,6 +66,20 @@ export function FileBrowser(
   const [blobMetadata, setBlobMetadata] = useState<Map<string, BlobMetadata>>(
     new Map(),
   );
+  // Alert dialog state
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    type: "info" | "warning" | "error" | "success";
+    confirmText?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "info",
+  });
 
   const fileOps = FileOperations.getInstance();
   const blobManager = BlobManager.getInstance();
@@ -218,42 +234,76 @@ export function FileBrowser(
   };
 
   const handleDeleteFile = async (file: PubkyFile) => {
-    if (!confirm(`Are you sure you want to delete "${file.name}"?`)) {
-      return;
-    }
+    const itemType = file.isDirectory ? "folder" : "file";
+    const warningText = file.isDirectory
+      ? `This will permanently delete the folder "${file.name}" and all its contents. This action cannot be undone.`
+      : `This will permanently delete the file "${file.name}". This action cannot be undone.`;
 
-    try {
-      const success = await fileOps.deleteFile(file.path);
-      if (success) {
-        showSuccess(`"${file.name}" deleted successfully`);
-        loadFiles(false);
-      } else {
-        showError("Failed to delete file");
-      }
-    } catch (error) {
-      showError(`Failed to delete file: ${error}`);
-    }
+    setAlertDialog({
+      isOpen: true,
+      title: `Delete ${itemType}`,
+      description: warningText,
+      type: "warning",
+      confirmText: `Delete ${itemType}`,
+      onConfirm: async () => {
+        try {
+          let success: boolean;
+
+          if (file.isDirectory) {
+            success = await fileOps.deleteDirectoryRecursively(file.path);
+          } else {
+            success = await fileOps.deleteFile(file.path);
+          }
+
+          if (success) {
+            // Refresh the file listing first
+            await loadFiles(false);
+            // Then show success message
+            showSuccess(`"${file.name}" deleted successfully`);
+          } else {
+            showError(`Failed to delete ${itemType}`);
+          }
+        } catch (error) {
+          showError(`Failed to delete ${itemType}: ${error}`);
+        }
+      },
+    });
   };
 
   const handleDownloadFile = async (file: PubkyFile) => {
     try {
-      const content = await fileOps.readFile(file.path);
-      if (content) {
-        const blob = new Blob([content], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = file.name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showSuccess(`"${file.name}" downloaded successfully`);
+      if (file.isDirectory) {
+        // Download folder as ZIP
+        showSuccess("Preparing folder for download...");
+        const success = await fileOps.downloadDirectoryAsZip(
+          file.path,
+          file.name,
+        );
+        if (success) {
+          showSuccess(`Folder "${file.name}" downloaded as ZIP successfully`);
+        } else {
+          showError("Failed to download folder");
+        }
       } else {
-        showError("Failed to download file");
+        // Download single file
+        const content = await fileOps.readFile(file.path);
+        if (content !== null) {
+          const blob = new Blob([content], { type: "text/plain" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = file.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showSuccess(`"${file.name}" downloaded successfully`);
+        } else {
+          showError("Failed to download file");
+        }
       }
     } catch (error) {
-      showError(`Failed to download file: ${error}`);
+      showError(`Failed to download: ${error}`);
     }
   };
 
@@ -392,15 +442,7 @@ export function FileBrowser(
             )}
           </div>
 
-          {/* File creation dialog */}
-          {!readOnlyMode && showCreationDialog && state.user && (
-            <FileCreationDialog
-              currentPath={currentPath}
-              userPublicKey={state.user.publicKey}
-              onFileCreated={handleFileCreated}
-              onCancel={() => setShowCreationDialog(false)}
-            />
-          )}
+
 
           {/* File list */}
           <div className="border rounded-md">
@@ -476,18 +518,21 @@ export function FileBrowser(
                         </div>
 
                         <div className="flex items-center space-x-1">
-                          {!file.isDirectory && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e: MouseEvent<HTMLButtonElement>) => {
-                                e.stopPropagation();
-                                handleDownloadFile(file);
-                              }}
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                              e.stopPropagation();
+                              handleDownloadFile(file);
+                            }}
+                            title={file.isDirectory
+                              ? "Download as ZIP"
+                              : "Download file"}
+                          >
+                            {file.isDirectory
+                              ? <Archive className="h-4 w-4" />
+                              : <Download className="h-4 w-4" />}
+                          </Button>
                           {!readOnlyMode && isTextFile(file.name) && (
                             <Button
                               variant="ghost"
@@ -542,6 +587,29 @@ export function FileBrowser(
           </div>
         </CardContent>
       </Card>
+
+      {/* Alert Dialog */}
+      <AlertDialog
+        isOpen={alertDialog.isOpen}
+        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+        onConfirm={alertDialog.onConfirm}
+        title={alertDialog.title}
+        description={alertDialog.description}
+        type={alertDialog.type}
+        confirmText={alertDialog.confirmText}
+        isDestructive={alertDialog.type === "warning"}
+      />
+
+      {/* File Creation Modal */}
+      {!readOnlyMode && state.user && (
+        <FileCreationDialog
+          isOpen={showCreationDialog}
+          currentPath={currentPath}
+          userPublicKey={state.user.publicKey}
+          onFileCreated={handleFileCreated}
+          onCancel={() => setShowCreationDialog(false)}
+        />
+      )}
     </div>
   );
 }

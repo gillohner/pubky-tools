@@ -375,4 +375,157 @@ export class FileOperations {
       return false;
     }
   }
+
+  /**
+   * Recursively get all files in a directory
+   */
+  public async getAllFilesRecursively(
+    directoryPath: string,
+  ): Promise<PubkyFile[]> {
+    try {
+      const normalizedPath = directoryPath.endsWith("/")
+        ? directoryPath
+        : directoryPath + "/";
+
+      // Get all URLs under this path (including nested)
+      const allUrls = await this.pubkyClient.list(normalizedPath);
+      const allFiles: PubkyFile[] = [];
+
+      for (const url of allUrls) {
+        if (
+          !url || url === normalizedPath || url.includes("Pubky Homeserver")
+        ) {
+          continue;
+        }
+
+        const relativePath = url.replace(normalizedPath, "");
+        if (!relativePath || relativePath.includes("Pubky Homeserver")) {
+          continue;
+        }
+
+        // Create file object
+        const fileName = relativePath.split("/").pop() || "";
+        const isDirectory = url.endsWith("/");
+
+        if (!isDirectory && fileName) {
+          allFiles.push({
+            name: fileName,
+            path: url,
+            isDirectory: false,
+            size: this.estimateFileSize(fileName),
+            lastModified: new Date().toISOString(),
+          });
+        }
+      }
+
+      return allFiles;
+    } catch (error) {
+      console.error("Failed to get all files recursively:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Recursively delete a directory and all its contents
+   */
+  public async deleteDirectoryRecursively(
+    directoryPath: string,
+  ): Promise<boolean> {
+    try {
+      console.log("Deleting directory recursively:", directoryPath);
+
+      // First get all files in the directory
+      const allFiles = await this.getAllFilesRecursively(directoryPath);
+      console.log(`Found ${allFiles.length} files to delete`);
+
+      // Delete all files first
+      for (const file of allFiles) {
+        console.log("Deleting file:", file.path);
+        const success = await this.pubkyClient.delete(file.path);
+        if (!success) {
+          console.error("Failed to delete file:", file.path);
+        }
+        // Remove from cache
+        await this.cacheManager.delete(file.path);
+      }
+
+      // Then delete the directory itself
+      const normalizedPath = directoryPath.endsWith("/")
+        ? directoryPath
+        : directoryPath + "/";
+
+      console.log("Deleting directory:", normalizedPath);
+      const success = await this.pubkyClient.delete(normalizedPath);
+
+      if (success) {
+        // Remove from cache
+        await this.cacheManager.delete(normalizedPath);
+
+        // Invalidate parent directory cache
+        const parentPath = this.getParentPath(directoryPath);
+        if (parentPath) {
+          await this.cacheManager.invalidate(parentPath);
+        }
+      }
+
+      return success;
+    } catch (error) {
+      console.error("Failed to delete directory recursively:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Download a directory as a ZIP file
+   */
+  public async downloadDirectoryAsZip(
+    directoryPath: string,
+    directoryName: string,
+  ): Promise<boolean> {
+    try {
+      // Dynamic import to avoid bundling JSZip if not used
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+
+      // Get all files recursively
+      const allFiles = await this.getAllFilesRecursively(directoryPath);
+      console.log(`Creating ZIP with ${allFiles.length} files`);
+
+      // Add each file to the ZIP
+      for (const file of allFiles) {
+        try {
+          const content = await this.readFile(file.path);
+          if (content !== null) {
+            // Get relative path within the directory
+            const normalizedDirPath = directoryPath.endsWith("/")
+              ? directoryPath
+              : directoryPath + "/";
+            const relativePath = file.path.replace(normalizedDirPath, "");
+            zip.file(relativePath, content);
+          }
+        } catch (error) {
+          console.warn(`Failed to add file ${file.path} to ZIP:`, error);
+          // Continue with other files
+        }
+      }
+
+      // Generate the ZIP file
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+
+      // Download the ZIP file
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${directoryName}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      return true;
+    } catch (error) {
+      console.error("Failed to download directory as ZIP:", error);
+      return false;
+    }
+  }
 }

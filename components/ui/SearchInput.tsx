@@ -18,7 +18,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             ref={ref}
-            className={cn("pl-10 h-input-h text-input", className)}
+            className={cn("pl-10 h-input-h text-sm", className)}
             {...props}
           />
         </div>
@@ -28,7 +28,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     return (
       <Input
         ref={ref}
-        className={cn("h-input-h text-input", className)}
+        className={cn("h-input-h text-sm", className)}
         {...props}
       />
     );

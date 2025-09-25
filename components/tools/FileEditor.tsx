@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
 import { NavigationHeader } from "@/components/ui/NavigationHeader";
+import { AlertDialog } from "@/components/ui/AlertDialog";
 import {
   getLanguage,
   SyntaxHighlighter,
@@ -222,6 +223,20 @@ export function FileEditor(
   const [previewMode, setPreviewMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(true);
+  // Alert dialog state
+  const [alertDialog, setAlertDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    type: "info" | "warning" | "error" | "success";
+    confirmText?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    description: "",
+    type: "info",
+  });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const fileOps = FileOperations.getInstance();
@@ -433,13 +448,24 @@ export function FileEditor(
 
   const handleNewFile = () => {
     if (hasUnsavedChanges && !readOnlyMode) {
-      if (
-        !confirm(
+      setAlertDialog({
+        isOpen: true,
+        title: "Unsaved Changes",
+        description:
           "You have unsaved changes. Are you sure you want to create a new file?",
-        )
-      ) {
-        return;
-      }
+        type: "warning",
+        confirmText: "Create New File",
+        onConfirm: () => {
+          setCurrentFile(null);
+          setContent("");
+          setOriginalContent("");
+          setHasUnsavedChanges(false);
+          setIsCreatingNew(true);
+          setFilePath("");
+          setAlertDialog((prev) => ({ ...prev, isOpen: false }));
+        },
+      });
+      return;
     }
 
     setCurrentFile(null);
@@ -781,6 +807,16 @@ export function FileEditor(
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog
+        isOpen={alertDialog.isOpen}
+        title={alertDialog.title}
+        description={alertDialog.description}
+        type={alertDialog.type}
+        confirmText={alertDialog.confirmText}
+        onConfirm={alertDialog.onConfirm}
+        onClose={() => setAlertDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }
