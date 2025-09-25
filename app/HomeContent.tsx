@@ -67,30 +67,41 @@ export default function HomeContent() {
     console.log("handleFileSelect called with:", file);
 
     try {
-      // Check if file is blob metadata
+      // Check if file is blob metadata (for media files)
       if (!file.isDirectory) {
         try {
           console.log("Checking if file is blob metadata:", file.path);
+
+          // Add a timeout to prevent hanging
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
           const response = await fetch(
             `/api/files/read?path=${encodeURIComponent(file.path)}`,
+            { signal: controller.signal },
           );
 
+          clearTimeout(timeoutId);
+
           if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-
-          const content = await response.text();
-          const metadata = blobManager.parseBlobMetadata(content);
-
-          if (metadata) {
-            console.log("File is blob metadata, opening in Media Viewer");
-            // Open in Media Viewer
-            setImagePath(file.path);
-            setActiveTab("image");
-            updateUrl("image", file.path);
-            return;
+            console.log(
+              `File read failed (${response.status}), trying as direct blob/text file`,
+            );
+            // Don't throw error, just continue to normal file handling
           } else {
-            console.log("File is not blob metadata, opening in editor");
+            const content = await response.text();
+            const metadata = blobManager.parseBlobMetadata(content);
+
+            if (metadata) {
+              console.log("File is blob metadata, opening in Media Viewer");
+              // Open in Media Viewer
+              setImagePath(file.path);
+              setActiveTab("image");
+              updateUrl("image", file.path);
+              return;
+            } else {
+              console.log("File is not blob metadata, opening in editor");
+            }
           }
         } catch (error) {
           // Not blob metadata or API error, continue with normal file handling
@@ -98,6 +109,23 @@ export default function HomeContent() {
             "Error checking blob metadata (will try editor):",
             error,
           );
+
+          // Check if it might be a direct media file by extension
+          const fileName = file.name || file.path.split("/").pop() || "";
+          const isLikelyMediaFile =
+            /\.(jpg|jpeg|png|gif|webp|mp4|webm|pdf|mp3|flac|wav)$/i.test(
+              fileName,
+            );
+
+          if (isLikelyMediaFile) {
+            console.log(
+              "File appears to be a direct media file, opening in Media Viewer",
+            );
+            setImagePath(file.path);
+            setActiveTab("image");
+            updateUrl("image", file.path);
+            return;
+          }
         }
       }
 
@@ -116,8 +144,14 @@ export default function HomeContent() {
       updateUrl("editor", file.path);
     } catch (error) {
       console.error("Error in handleFileSelect:", error);
-      // You might want to add a toast notification here
-      // showError(`Failed to open file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Add better user feedback
+      console.log("Failed to open file, but continuing with editor fallback");
+
+      // Fallback: always try to open in editor
+      setSelectedFile(file);
+      setEditorPath(file.path);
+      setActiveTab("editor");
+      updateUrl("editor", file.path);
     }
   };
 
@@ -227,8 +261,6 @@ export default function HomeContent() {
   ]);
 
   const renderTabNavigation = () => {
-    if (!isAuthenticated) return null;
-
     return (
       <div className="flex space-x-1 p-1 bg-muted rounded-lg">
         <button
@@ -275,39 +307,10 @@ export default function HomeContent() {
   };
 
   const renderTabContent = () => {
-    if (!isAuthenticated) {
-      return (
-        <div className="space-y-6">
-          {/* Read-only notice */}
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-            <div className="flex items-center space-x-2">
-              <Eye className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
-              <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                <strong>Read-only mode:</strong>{" "}
-                You can browse public files but cannot edit or upload. Login to
-                access your personal files.
-              </p>
-            </div>
-          </div>
-
-          {/* Show FileBrowser for unauthenticated users */}
-          <FileBrowser
-            onFileSelect={handleFileSelect}
-            selectedFile={selectedFile}
-            readOnlyMode={true}
-            currentPath={currentPath}
-            onPathChange={setCurrentPath}
-            onFileCreated={handleFileCreated}
-          />
-        </div>
-      );
-    }
-
-    // For authenticated users, show tab content
     return (
       <div className="space-y-4">
-        {/* Read-only notice for authenticated users (if needed) */}
-        {readOnlyMode && (
+        {/* Read-only notice for unauthenticated users */}
+        {!isAuthenticated && (
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
             <div className="flex items-center space-x-2">
               <Eye className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />

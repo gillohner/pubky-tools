@@ -115,14 +115,17 @@ export class PubkyClient {
 
     try {
       console.log("Pubky client GET:", url);
+      // Use longer timeout for blob files (up to 60 seconds for large files)
+      const timeout = url.includes("/blobs/") ? 60000 : 30000;
+
       // If it's a pubky:// URL, let the SDK handle it directly with timeout
-      const response = await this.withTimeout(this.client.fetch(url), 30000);
+      const response = await this.withTimeout(this.client.fetch(url), timeout);
       console.log("Response status:", response.status, response.statusText);
 
       if (response.ok) {
         const arrayBuffer = await this.withTimeout(
           response.arrayBuffer(),
-          30000,
+          timeout,
         ) as ArrayBuffer;
         const result = new Uint8Array(arrayBuffer);
         console.log("Successfully fetched data, length:", result.length);

@@ -244,6 +244,10 @@ export function MediaViewer({
 
     const loadFileData = async () => {
       setLoading(true);
+      setMediaLoading(true);
+      setMediaError(false);
+      setBlobData(null);
+
       try {
         // Create file object from path
         const fileName = getFileName(null, filePath);
@@ -257,11 +261,14 @@ export function MediaViewer({
         // First try to load as metadata file (most common case for uploaded media)
         let metadataError: string | null = null;
         try {
-          const content = await fileOps.readFile(filePath);
+          console.log("Attempting to load as metadata file:", filePath);
+          const content = await fileOps.readFile(filePath, false); // Don't use cache for fresh data
           if (content) {
             const parsedMetadata = blobManager.parseBlobMetadata(content);
             if (parsedMetadata) {
+              console.log("Successfully loaded metadata:", parsedMetadata);
               setMetadata(parsedMetadata);
+              setMediaLoading(false); // Will be set to true again when loading blob
               return;
             } else {
               metadataError = "File contains invalid metadata format";
@@ -279,6 +286,7 @@ export function MediaViewer({
         // If metadata loading failed, try to load as direct blob (for direct image/media files)
         let blobError: string | null = null;
         try {
+          console.log("Attempting to load as direct blob file:", filePath);
           const blobContent = await fileOps.readBinaryFile(filePath);
           if (blobContent && blobContent.length > 0) {
             // This is a direct blob file, detect content type from file extension first, then from content
@@ -296,6 +304,11 @@ export function MediaViewer({
               size: blobContent.length,
               created_at: Date.now(),
             };
+
+            console.log(
+              "Successfully loaded direct blob, creating metadata:",
+              directMetadata,
+            );
             setMetadata(directMetadata);
 
             // Since we already have the blob data, convert it to display URL immediately
@@ -590,6 +603,79 @@ export function MediaViewer({
     );
   }
 
+  // Show loading state while file info is being loaded
+  if (loading || !file) {
+    return (
+      <div className="space-y-4">
+        <NavigationHeader
+          path={filePath || ""}
+          onNavigate={onNavigateToPath}
+          showBackButton={!!onBack}
+          onBack={onBack}
+          backButtonText="Back to Browser"
+          fileName="Loading..."
+          showFileName={false}
+          context="image"
+          variant="muted"
+          showCopyButton={false}
+          directEditing
+        />
+        <Card>
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <RefreshCw className="h-8 w-8 animate-spin" />
+              <div className="text-lg">Loading file...</div>
+              <div className="text-sm text-muted-foreground">
+                Please wait while we load the file data
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error state if we couldn't load file info at all
+  if (!metadata) {
+    return (
+      <div className="space-y-4">
+        <NavigationHeader
+          path={getFullFilePath(file, filePath)}
+          onNavigate={onNavigateToPath}
+          showBackButton={!!onBack}
+          onBack={onBack}
+          backButtonText="Back to Browser"
+          fileName={file?.name || "Unknown"}
+          showFileName={false}
+          context="image"
+          variant="muted"
+          showCopyButton={false}
+          directEditing
+        />
+        <Card>
+          <CardContent className="p-8">
+            <div className="flex flex-col items-center justify-center space-y-4">
+              <AlertCircle className="h-8 w-8 text-red-500" />
+              <div className="text-lg">Failed to load file</div>
+              <div className="text-sm text-muted-foreground text-center">
+                This file could not be loaded as media content.<br />
+                It may not be a supported media file or there may be a network
+                issue.
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => window.location.reload()}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Navigation */}
@@ -618,18 +704,29 @@ export function MediaViewer({
         <CardContent>
           <div className="space-y-6">
             {/* Media Display */}
-            <div className="flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-lg p-4 min-h-[200px]">
+            <div className="flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-lg p-4 min-h-[300px]">
               {mediaLoading && (
-                <div className="flex items-center space-x-2">
-                  <RefreshCw className="h-6 w-6 animate-spin" />
-                  <span>Loading media...</span>
+                <div className="flex flex-col items-center space-y-3">
+                  <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
+                  <div className="text-lg">Loading media...</div>
+                  <div className="text-sm text-muted-foreground text-center">
+                    {metadata.size
+                      ? `Loading ${formatFileSize(metadata.size)} file`
+                      : "Loading file content"}
+                  </div>
                 </div>
               )}
 
               {!mediaLoading && mediaError && (
-                <div className="flex flex-col items-center space-y-2 text-red-500">
-                  <AlertCircle className="h-8 w-8" />
-                  <span>Failed to load media</span>
+                <div className="flex flex-col items-center space-y-3 text-red-500">
+                  <AlertCircle className="h-10 w-10" />
+                  <div className="text-lg font-medium">
+                    Failed to load media
+                  </div>
+                  <div className="text-sm text-center text-muted-foreground max-w-md">
+                    The media content could not be loaded. This might be due to
+                    network issues or file corruption.
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
