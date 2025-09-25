@@ -183,11 +183,23 @@ export function FileBrowser(
         return;
       }
 
-      if (onFileSelect) {
-        onFileSelect(file);
+      console.log("File clicked:", file.path, "Name:", file.name);
+
+      try {
+        if (onFileSelect) {
+          console.log("Calling onFileSelect with file:", file);
+          onFileSelect(file);
+        } else {
+          console.warn("No onFileSelect handler provided");
+        }
+      } catch (error) {
+        console.error("Error in file selection handler:", error);
+        showError(
+          `Failed to open file: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+        );
       }
-      // TODO: Open file in editor
-      console.log("Opening file:", file.path);
     }
   };
 

@@ -95,19 +95,63 @@ export class PubkyClient {
     }
   }
 
+  // Helper function to add timeout to fetch operations
+  private withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number = 30000,
+  ): Promise<T> {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(
+        () => reject(new Error(`Operation timeout after ${timeoutMs}ms`)),
+        timeoutMs,
+      );
+    });
+
+    return Promise.race([promise, timeoutPromise]);
+  }
+
   public async get(url: string): Promise<Uint8Array | null> {
     this.ensureInitialized();
 
     try {
-      // If it's a pubky:// URL, let the SDK handle it directly
-      const response = await this.client.fetch(url);
+      console.log("Pubky client GET:", url);
+      // If it's a pubky:// URL, let the SDK handle it directly with timeout
+      const response = await this.withTimeout(this.client.fetch(url), 30000);
+      console.log("Response status:", response.status, response.statusText);
+
       if (response.ok) {
-        const arrayBuffer = await response.arrayBuffer();
-        return new Uint8Array(arrayBuffer);
+        const arrayBuffer = await this.withTimeout(
+          response.arrayBuffer(),
+          30000,
+        ) as ArrayBuffer;
+        const result = new Uint8Array(arrayBuffer);
+        console.log("Successfully fetched data, length:", result.length);
+        return result;
+      } else {
+        console.error(
+          "HTTP error response:",
+          response.status,
+          response.statusText,
+          url,
+        );
+        return null;
       }
-      return null;
     } catch (error) {
-      console.error("Failed to get data:", error);
+      // Check for specific error types
+      if (error instanceof Error && error.message.includes("timeout")) {
+        console.error("Request timeout:", error.message, url);
+      } else if (
+        error instanceof TypeError && error.message.includes("fetch")
+      ) {
+        console.error("Network/fetch error:", error.message, url);
+      } else if (
+        error instanceof Error &&
+        (error.name === "CompileError" || error.name === "RuntimeError")
+      ) {
+        console.error("WebAssembly error:", error, url);
+      } else {
+        console.error("Pubky client error:", error, url);
+      }
       return null;
     }
   }
@@ -116,14 +160,23 @@ export class PubkyClient {
     this.ensureInitialized();
 
     try {
-      const response = await this.client.fetch(url, {
-        method: "PUT",
-        body: content,
-        credentials: "include",
-      });
+      console.log("Pubky client PUT:", url, "Size:", content.length);
+      const response = await this.withTimeout(
+        this.client.fetch(url, {
+          method: "PUT",
+          body: content,
+          credentials: "include",
+        }),
+        30000,
+      );
+      console.log("PUT response status:", response.status, response.statusText);
       return response.ok;
     } catch (error) {
-      console.error("Failed to put data:", error);
+      if (error instanceof Error && error.message.includes("timeout")) {
+        console.error("PUT timeout:", error.message, url);
+      } else {
+        console.error("Failed to put data:", error, url);
+      }
       return false;
     }
   }
@@ -149,13 +202,26 @@ export class PubkyClient {
     this.ensureInitialized();
 
     try {
-      const response = await this.client.fetch(url, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      console.log("Pubky client DELETE:", url);
+      const response = await this.withTimeout(
+        this.client.fetch(url, {
+          method: "DELETE",
+          credentials: "include",
+        }),
+        30000,
+      );
+      console.log(
+        "DELETE response status:",
+        response.status,
+        response.statusText,
+      );
       return response.ok;
     } catch (error) {
-      console.error("Failed to delete:", error);
+      if (error instanceof Error && error.message.includes("timeout")) {
+        console.error("DELETE timeout:", error.message, url);
+      } else {
+        console.error("Failed to delete:", error, url);
+      }
       return false;
     }
   }

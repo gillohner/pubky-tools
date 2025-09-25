@@ -255,6 +255,7 @@ export function MediaViewer({
         setFile(fileObj);
 
         // First try to load as metadata file (most common case for uploaded media)
+        let metadataError: string | null = null;
         try {
           const content = await fileOps.readFile(filePath);
           if (content) {
@@ -262,16 +263,24 @@ export function MediaViewer({
             if (parsedMetadata) {
               setMetadata(parsedMetadata);
               return;
+            } else {
+              metadataError = "File contains invalid metadata format";
             }
+          } else {
+            metadataError = "Failed to read metadata file content";
           }
-        } catch {
-          console.debug("Not a metadata file, trying as direct blob...");
+        } catch (error) {
+          metadataError = `Metadata loading error: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`;
+          console.debug("Not a metadata file, trying as direct blob...", error);
         }
 
         // If metadata loading failed, try to load as direct blob (for direct image/media files)
+        let blobError: string | null = null;
         try {
           const blobContent = await fileOps.readBinaryFile(filePath);
-          if (blobContent) {
+          if (blobContent && blobContent.length > 0) {
             // This is a direct blob file, detect content type from file extension first, then from content
             let contentType = getContentTypeFromExtension(fileName);
 
@@ -298,14 +307,29 @@ export function MediaViewer({
             setBlobData(dataUrl);
             setMediaLoading(false);
             return;
+          } else {
+            blobError = "File is empty or failed to read binary content";
           }
-        } catch {
-          console.debug("Not a blob file either...");
+        } catch (error) {
+          blobError = `Binary loading error: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`;
+          console.debug("Not a blob file either...", error);
         }
 
-        showError(
-          "File is neither valid blob metadata nor a direct media file",
-        );
+        // Show detailed error information
+        const combinedError = [
+          `Failed to load file: ${filePath}`,
+          metadataError ? `Metadata: ${metadataError}` : null,
+          blobError ? `Binary: ${blobError}` : null,
+        ].filter(Boolean).join(" | ");
+
+        console.error("File loading failed:", {
+          filePath,
+          metadataError,
+          blobError,
+        });
+        showError(combinedError);
       } catch (error) {
         console.error("Error loading file:", error);
         showError("Failed to load file");
@@ -327,9 +351,10 @@ export function MediaViewer({
       setMediaLoading(true);
       setMediaError(false);
 
+      console.log("Loading blob data from:", metadata.src);
       const blobContent = await fileOps.readBinaryFile(metadata.src);
 
-      if (blobContent) {
+      if (blobContent && blobContent.length > 0) {
         // Convert blob content to data URL for display
         const buffer = new ArrayBuffer(blobContent.length);
         const view = new Uint8Array(buffer);
@@ -337,14 +362,25 @@ export function MediaViewer({
         const blob = new Blob([buffer], { type: metadata.content_type });
         const dataUrl = URL.createObjectURL(blob);
         setBlobData(dataUrl);
+        console.log("Successfully loaded blob data, size:", blobContent.length);
       } else {
+        const errorMsg = `Failed to load media blob: ${
+          blobContent ? "Empty file" : "No data returned"
+        }`;
+        console.error(errorMsg, {
+          src: metadata.src,
+          contentType: metadata.content_type,
+        });
         setMediaError(true);
-        showError("Failed to load media blob");
+        showError(errorMsg);
       }
-    } catch {
-      console.error("Error loading blob:");
+    } catch (error) {
+      const errorMsg = `Error loading blob from ${metadata.src}: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`;
+      console.error("Error loading blob:", error, { metadata });
       setMediaError(true);
-      showError("Failed to load media blob");
+      showError(errorMsg);
     } finally {
       setMediaLoading(false);
     }

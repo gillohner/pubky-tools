@@ -13,6 +13,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { BlobManager } from "@/lib/blob-manager";
 import { PubkyFile } from "@/types/index";
 import { Eye } from "lucide-react";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 type Tab = "browser" | "editor" | "image";
 
@@ -63,39 +64,61 @@ export default function HomeContent() {
   }, [initialPath, editorPath, currentPath, getParentPath]);
 
   const handleFileSelect = async (file: PubkyFile) => {
-    // Check if file is blob metadata
-    if (!file.isDirectory) {
-      try {
-        const content = await fetch(
-          `/api/files/read?path=${encodeURIComponent(file.path)}`,
-        ).then((r) => r.text());
-        const metadata = blobManager.parseBlobMetadata(content);
+    console.log("handleFileSelect called with:", file);
 
-        if (metadata) {
-          // Open in Media Viewer
-          setImagePath(file.path);
-          setActiveTab("image");
-          updateUrl("image", file.path);
-          return;
+    try {
+      // Check if file is blob metadata
+      if (!file.isDirectory) {
+        try {
+          console.log("Checking if file is blob metadata:", file.path);
+          const response = await fetch(
+            `/api/files/read?path=${encodeURIComponent(file.path)}`,
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const content = await response.text();
+          const metadata = blobManager.parseBlobMetadata(content);
+
+          if (metadata) {
+            console.log("File is blob metadata, opening in Media Viewer");
+            // Open in Media Viewer
+            setImagePath(file.path);
+            setActiveTab("image");
+            updateUrl("image", file.path);
+            return;
+          } else {
+            console.log("File is not blob metadata, opening in editor");
+          }
+        } catch (error) {
+          // Not blob metadata or API error, continue with normal file handling
+          console.debug(
+            "Error checking blob metadata (will try editor):",
+            error,
+          );
         }
-      } catch {
-        // Not blob metadata, continue with normal file handling
-        console.debug("Not blob metadata, opening in editor");
       }
+
+      // Normal file handling
+      console.log("Opening file in editor:", file.path);
+      setSelectedFile(file);
+      setEditorPath(file.path);
+
+      // Extract parent directory from file path to preserve folder location
+      const parentPath = getParentPath(file.path);
+      if (parentPath) {
+        setCurrentPath(parentPath);
+      }
+
+      setActiveTab("editor");
+      updateUrl("editor", file.path);
+    } catch (error) {
+      console.error("Error in handleFileSelect:", error);
+      // You might want to add a toast notification here
+      // showError(`Failed to open file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    // Normal file handling
-    setSelectedFile(file);
-    setEditorPath(file.path);
-
-    // Extract parent directory from file path to preserve folder location
-    const parentPath = getParentPath(file.path);
-    if (parentPath) {
-      setCurrentPath(parentPath);
-    }
-
-    setActiveTab("editor");
-    updateUrl("editor", file.path);
   };
 
   const handleBackToBrowser = () => {
@@ -312,15 +335,31 @@ export default function HomeContent() {
         {activeTab === "editor" && (
           selectedFile || editorPath
             ? (
-              <FileEditor
-                file={selectedFile || undefined}
-                initialPath={editorPath}
-                onFileChange={handleFileChange}
-                readOnlyMode={readOnlyMode}
-                onBackToBrowser={handleBackToBrowser}
-                onNavigateToPath={handleIntelligentNavigate}
-                currentFolderPath={currentPath}
-              />
+              <ErrorBoundary
+                fallback={
+                  <div className="p-8 text-center">
+                    <div className="text-red-600 mb-4">
+                      Failed to load File Editor
+                    </div>
+                    <button
+                      onClick={() => setActiveTab("browser")}
+                      className="text-blue-600 hover:underline"
+                    >
+                      Return to File Browser
+                    </button>
+                  </div>
+                }
+              >
+                <FileEditor
+                  file={selectedFile || undefined}
+                  initialPath={editorPath}
+                  onFileChange={handleFileChange}
+                  readOnlyMode={readOnlyMode}
+                  onBackToBrowser={handleBackToBrowser}
+                  onNavigateToPath={handleIntelligentNavigate}
+                  currentFolderPath={currentPath}
+                />
+              </ErrorBoundary>
             )
             : (
               <div className="space-y-6">
@@ -360,13 +399,29 @@ export default function HomeContent() {
         {activeTab === "image" && (
           imagePath
             ? (
-              <MediaViewer
-                filePath={imagePath}
-                onNavigateToPath={handleIntelligentNavigate}
-                onEditInTextEditor={handleEditInTextEditor}
-                onBack={handleBackToBrowser}
-                readOnlyMode={readOnlyMode}
-              />
+              <ErrorBoundary
+                fallback={
+                  <div className="p-8 text-center">
+                    <div className="text-red-600 mb-4">
+                      Failed to load Media Viewer
+                    </div>
+                    <button
+                      onClick={() => setActiveTab("browser")}
+                      className="text-blue-600 hover:underline"
+                    >
+                      Return to File Browser
+                    </button>
+                  </div>
+                }
+              >
+                <MediaViewer
+                  filePath={imagePath}
+                  onNavigateToPath={handleIntelligentNavigate}
+                  onEditInTextEditor={handleEditInTextEditor}
+                  onBack={handleBackToBrowser}
+                  readOnlyMode={readOnlyMode}
+                />
+              </ErrorBoundary>
             )
             : (
               <div className="space-y-4">

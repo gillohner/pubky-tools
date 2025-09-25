@@ -246,15 +246,41 @@ export function FileEditor(
     setIsLoading(true);
 
     try {
+      console.log("Loading file:", currentFile.path);
       const fileContent = await fileOps.readFile(currentFile.path);
-      // Handle both empty files (null/empty string) and actual content
-      const content = fileContent || "";
-      setContent(content);
-      setOriginalContent(content);
+
+      // Check if file content was successfully retrieved
+      if (fileContent !== null) {
+        // Handle both empty files (empty string) and actual content
+        const content = fileContent || "";
+        setContent(content);
+        setOriginalContent(content);
+        setHasUnsavedChanges(false);
+        setIsCreatingNew(false);
+        console.log("Successfully loaded file, length:", content.length);
+      } else {
+        // File could not be read
+        const errorMsg =
+          `Failed to read file: ${currentFile.path} - File not found or inaccessible`;
+        console.error(errorMsg);
+        showError(errorMsg);
+        // Reset to empty content on error
+        setContent("");
+        setOriginalContent("");
+        setHasUnsavedChanges(false);
+        setIsCreatingNew(false);
+      }
+    } catch (error) {
+      const errorMsg = `Failed to load file "${currentFile.name}": ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`;
+      console.error("File loading error:", error, { file: currentFile });
+      showError(errorMsg);
+      // Reset to empty content on error
+      setContent("");
+      setOriginalContent("");
       setHasUnsavedChanges(false);
       setIsCreatingNew(false);
-    } catch (error) {
-      showError(`Failed to load file: ${error}`);
     } finally {
       setIsLoading(false);
     }
