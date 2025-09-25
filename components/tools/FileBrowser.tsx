@@ -27,6 +27,7 @@ import { PathBreadcrumb } from "@/components/ui/PathBreadcrumb";
 import { AlertDialog } from "@/components/ui/AlertDialog";
 import {
   Archive,
+  Copy,
   Download,
   Edit,
   File,
@@ -44,6 +45,7 @@ interface FileBrowserProps {
   currentPath?: string;
   onPathChange?: (path: string) => void;
   onFileCreated?: (newFile?: PubkyFile) => void;
+  onCopyPath?: (path: string, type: "current" | "shareable") => void;
 }
 
 export function FileBrowser(
@@ -54,6 +56,7 @@ export function FileBrowser(
     currentPath: externalCurrentPath,
     onPathChange,
     onFileCreated,
+    onCopyPath,
   }: FileBrowserProps,
 ) {
   const { state } = useAuth();
@@ -531,6 +534,19 @@ export function FileBrowser(
                               ? <Archive className="h-4 w-4" />
                               : <Download className="h-4 w-4" />}
                           </Button>
+                          {onCopyPath && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                                e.stopPropagation();
+                                onCopyPath(file.path, "current");
+                              }}
+                              title="Copy path"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          )}
                           {!readOnlyMode && isTextFile(file.name) && (
                             <Button
                               variant="ghost"

@@ -14,6 +14,15 @@ import { BlobManager } from "@/lib/blob-manager";
 import { PubkyFile } from "@/types/index";
 import { Eye } from "lucide-react";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import {
+  copyToClipboard,
+  createFileFromPath,
+  generateShareableUrl,
+  getParentPath,
+  getRecommendedTool,
+  isLikelyMediaFile,
+} from "@/lib/path-utils";
+import { useToast } from "@/hooks/useToast";
 
 type Tab = "browser" | "editor" | "image";
 
@@ -34,16 +43,10 @@ export default function HomeContent() {
   const [currentPath, setCurrentPath] = useState<string>("");
 
   const blobManager = BlobManager.getInstance();
+  const { showSuccess, showError } = useToast();
 
   const isAuthenticated = state.isAuthenticated;
   const readOnlyMode = !isAuthenticated;
-
-  // Helper function to get parent directory from file path
-  const getParentPath = useCallback((filePath: string): string => {
-    if (!filePath || !filePath.includes("/")) return filePath;
-    const lastSlashIndex = filePath.lastIndexOf("/");
-    return filePath.substring(0, lastSlashIndex);
-  }, []);
 
   // Update URL when tab or path changes
   const updateUrl = useCallback((tool: Tab, path?: string) => {
@@ -55,76 +58,115 @@ export default function HomeContent() {
     router.replace(`?${params.toString()}`, { scroll: false });
   }, [router]);
 
-  // Sync initial URL parameters
+  // Enhanced initialization from URL parameters
   useEffect(() => {
-    if (initialPath && !editorPath && !currentPath) {
-      setEditorPath(initialPath);
-      setCurrentPath(getParentPath(initialPath));
-    }
-  }, [initialPath, editorPath, currentPath, getParentPath]);
+    const initializeFromUrl = async () => {
+      if (!initialPath) return;
+
+      console.log("Initializing from URL:", { initialTab, initialPath });
+
+      // Set up basic paths using utility function
+      const parentPath = getParentPath(initialPath);
+      setCurrentPath(parentPath);
+
+      // Create a file object for the initial path using utility
+      const fileObj = createFileFromPath(initialPath);
+      setSelectedFile(fileObj);
+
+      // Set appropriate paths based on tab
+      if (initialTab === "image") {
+        setImagePath(initialPath);
+      } else if (initialTab === "editor") {
+        setEditorPath(initialPath);
+      }
+
+      // Update active tab to match URL
+      setActiveTab(initialTab);
+    };
+
+    initializeFromUrl();
+  }, [initialTab, initialPath]);
 
   const handleFileSelect = async (file: PubkyFile) => {
     console.log("handleFileSelect called with:", file);
 
     try {
-      // Check if file is blob metadata (for media files)
       if (!file.isDirectory) {
-        try {
-          console.log("Checking if file is blob metadata:", file.path);
+        const fileName = file.name || file.path.split("/").pop() || "";
 
-          // Add a timeout to prevent hanging
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-          const response = await fetch(
-            `/api/files/read?path=${encodeURIComponent(file.path)}`,
-            { signal: controller.signal },
+        // First, check if it's likely a direct media file by extension
+        if (isLikelyMediaFile(fileName)) {
+          console.log(
+            "File appears to be a direct media file, opening in Media Viewer",
           );
+          setImagePath(file.path);
+          setActiveTab("image");
+          updateUrl("image", file.path);
+          return;
+        }
 
-          clearTimeout(timeoutId);
+        // Only check for blob metadata if:
+        // 1. File has no extension (could be JSON-like)
+        // 2. File is small (typical blob metadata is <1KB)
+        // 3. File doesn't have a clear text extension
+        const hasExtension = fileName.includes(".") &&
+          !fileName.startsWith(".");
+        const extension = hasExtension
+          ? fileName.split(".").pop()?.toLowerCase()
+          : "";
 
-          if (!response.ok) {
-            console.log(
-              `File read failed (${response.status}), trying as direct blob/text file`,
+        // Skip blob check for clearly non-JSON files
+        const skipBlobCheck = hasExtension && extension &&
+          ![
+            "json",
+            "txt",
+            "md",
+            "js",
+            "ts",
+            "html",
+            "css",
+            "xml",
+            "yaml",
+            "yml",
+          ].includes(extension);
+
+        if (!skipBlobCheck) {
+          try {
+            console.log("Checking if file might be blob metadata:", file.path);
+
+            // Add a timeout to prevent hanging
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // Reduced to 5 seconds
+
+            const response = await fetch(
+              `/api/files/read?path=${encodeURIComponent(file.path)}`,
+              { signal: controller.signal },
             );
-            // Don't throw error, just continue to normal file handling
-          } else {
-            const content = await response.text();
-            const metadata = blobManager.parseBlobMetadata(content);
 
-            if (metadata) {
-              console.log("File is blob metadata, opening in Media Viewer");
-              // Open in Media Viewer
-              setImagePath(file.path);
-              setActiveTab("image");
-              updateUrl("image", file.path);
-              return;
-            } else {
-              console.log("File is not blob metadata, opening in editor");
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+              const content = await response.text();
+
+              // Quick size check - blob metadata is typically very small
+              if (content.length < 2000) { // Only check files smaller than 2KB
+                const metadata = blobManager.parseBlobMetadata(content);
+
+                if (metadata) {
+                  console.log("File is blob metadata, opening in Media Viewer");
+                  setImagePath(file.path);
+                  setActiveTab("image");
+                  updateUrl("image", file.path);
+                  return;
+                }
+              }
             }
-          }
-        } catch (error) {
-          // Not blob metadata or API error, continue with normal file handling
-          console.debug(
-            "Error checking blob metadata (will try editor):",
-            error,
-          );
-
-          // Check if it might be a direct media file by extension
-          const fileName = file.name || file.path.split("/").pop() || "";
-          const isLikelyMediaFile =
-            /\.(jpg|jpeg|png|gif|webp|mp4|webm|pdf|mp3|flac|wav)$/i.test(
-              fileName,
+          } catch (error) {
+            // Silently continue with normal file handling
+            console.debug(
+              "Error checking blob metadata (will try editor):",
+              error,
             );
-
-          if (isLikelyMediaFile) {
-            console.log(
-              "File appears to be a direct media file, opening in Media Viewer",
-            );
-            setImagePath(file.path);
-            setActiveTab("image");
-            updateUrl("image", file.path);
-            return;
           }
         }
       }
@@ -185,6 +227,40 @@ export default function HomeContent() {
     setActiveTab("editor");
     updateUrl("editor", file.path);
   };
+
+  // Copy path functionality
+  const handleCopyPath = useCallback(
+    async (path: string, context?: "current" | "shareable") => {
+      try {
+        let textToCopy: string;
+
+        if (context === "shareable") {
+          // Generate a shareable URL
+          const tool = getRecommendedTool(path.split("/").pop() || "");
+          textToCopy = generateShareableUrl(path, tool);
+        } else {
+          // Copy the raw path
+          textToCopy = path;
+        }
+
+        const success = await copyToClipboard(textToCopy);
+
+        if (success) {
+          showSuccess(
+            context === "shareable"
+              ? "Shareable URL copied to clipboard"
+              : "Path copied to clipboard",
+          );
+        } else {
+          showError("Failed to copy to clipboard");
+        }
+      } catch (error) {
+        console.error("Copy failed:", error);
+        showError("Failed to copy to clipboard");
+      }
+    },
+    [showSuccess, showError],
+  );
 
   // Helper function to intelligently handle navigation to files or directories
   const handleIntelligentNavigate = useCallback(async (path: string) => {
@@ -257,7 +333,6 @@ export default function HomeContent() {
     setImagePath,
     setSelectedFile,
     setEditorPath,
-    getParentPath,
   ]);
 
   const renderTabNavigation = () => {
@@ -332,6 +407,7 @@ export default function HomeContent() {
             currentPath={currentPath}
             onPathChange={setCurrentPath}
             onFileCreated={handleFileCreated}
+            onCopyPath={handleCopyPath}
           />
         )}
 
