@@ -10,7 +10,6 @@ import { LoginModal } from "@/components/auth/LoginModal";
 import { UnauthenticatedHeader } from "@/components/layout/UnauthenticatedHeader";
 import { MediaViewer } from "@/components/tools/MediaViewer";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { BlobManager } from "@/lib/blob-manager";
 import { PubkyFile } from "@/types/index";
 import { Eye } from "lucide-react";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
@@ -20,7 +19,6 @@ import {
   generateShareableUrl,
   getParentPath,
   getRecommendedTool,
-  isLikelyMediaFile,
 } from "@/lib/path-utils";
 import { useToast } from "@/hooks/useToast";
 
@@ -42,7 +40,6 @@ export default function HomeContent() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [currentPath, setCurrentPath] = useState<string>("");
 
-  const blobManager = BlobManager.getInstance();
   const { showSuccess, showError } = useToast();
 
   const isAuthenticated = state.isAuthenticated;
@@ -87,114 +84,22 @@ export default function HomeContent() {
     initializeFromUrl();
   }, [initialTab, initialPath]);
 
-  const handleFileSelect = async (file: PubkyFile) => {
+  const handleFileSelect = (file: PubkyFile) => {
     console.log("handleFileSelect called with:", file);
 
-    try {
-      if (!file.isDirectory) {
-        const fileName = file.name || file.path.split("/").pop() || "";
+    // Always open files in File Editor first - no more guessing or API calls
+    // The FileEditor will handle detecting blob metadata and showing appropriate actions
+    setSelectedFile(file);
+    setEditorPath(file.path);
 
-        // First, check if it's likely a direct media file by extension
-        if (isLikelyMediaFile(fileName)) {
-          console.log(
-            "File appears to be a direct media file, opening in Media Viewer",
-          );
-          setImagePath(file.path);
-          setActiveTab("image");
-          updateUrl("image", file.path);
-          return;
-        }
-
-        // Only check for blob metadata if:
-        // 1. File has no extension (could be JSON-like)
-        // 2. File is small (typical blob metadata is <1KB)
-        // 3. File doesn't have a clear text extension
-        const hasExtension = fileName.includes(".") &&
-          !fileName.startsWith(".");
-        const extension = hasExtension
-          ? fileName.split(".").pop()?.toLowerCase()
-          : "";
-
-        // Skip blob check for clearly non-JSON files
-        const skipBlobCheck = hasExtension && extension &&
-          ![
-            "json",
-            "txt",
-            "md",
-            "js",
-            "ts",
-            "html",
-            "css",
-            "xml",
-            "yaml",
-            "yml",
-          ].includes(extension);
-
-        if (!skipBlobCheck) {
-          try {
-            console.log("Checking if file might be blob metadata:", file.path);
-
-            // Add a timeout to prevent hanging
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // Reduced to 5 seconds
-
-            const response = await fetch(
-              `/api/files/read?path=${encodeURIComponent(file.path)}`,
-              { signal: controller.signal },
-            );
-
-            clearTimeout(timeoutId);
-
-            if (response.ok) {
-              const content = await response.text();
-
-              // Quick size check - blob metadata is typically very small
-              if (content.length < 2000) { // Only check files smaller than 2KB
-                const metadata = blobManager.parseBlobMetadata(content);
-
-                if (metadata) {
-                  console.log("File is blob metadata, opening in Media Viewer");
-                  setImagePath(file.path);
-                  setActiveTab("image");
-                  updateUrl("image", file.path);
-                  return;
-                }
-              }
-            }
-          } catch (error) {
-            // Silently continue with normal file handling
-            console.debug(
-              "Error checking blob metadata (will try editor):",
-              error,
-            );
-          }
-        }
-      }
-
-      // Normal file handling
-      console.log("Opening file in editor:", file.path);
-      setSelectedFile(file);
-      setEditorPath(file.path);
-
-      // Extract parent directory from file path to preserve folder location
-      const parentPath = getParentPath(file.path);
-      if (parentPath) {
-        setCurrentPath(parentPath);
-      }
-
-      setActiveTab("editor");
-      updateUrl("editor", file.path);
-    } catch (error) {
-      console.error("Error in handleFileSelect:", error);
-      // Add better user feedback
-      console.log("Failed to open file, but continuing with editor fallback");
-
-      // Fallback: always try to open in editor
-      setSelectedFile(file);
-      setEditorPath(file.path);
-      setActiveTab("editor");
-      updateUrl("editor", file.path);
+    // Extract parent directory from file path to preserve folder location
+    const parentPath = getParentPath(file.path);
+    if (parentPath) {
+      setCurrentPath(parentPath);
     }
+
+    setActiveTab("editor");
+    updateUrl("editor", file.path);
   };
 
   const handleBackToBrowser = () => {
@@ -226,6 +131,13 @@ export default function HomeContent() {
     setEditorPath(file.path);
     setActiveTab("editor");
     updateUrl("editor", file.path);
+  };
+
+  const handleViewMedia = (blobPath: string) => {
+    console.log("Opening blob in Media Viewer:", blobPath);
+    setImagePath(blobPath);
+    setActiveTab("image");
+    updateUrl("image", blobPath);
   };
 
   // Copy path functionality
@@ -288,49 +200,26 @@ export default function HomeContent() {
       return;
     }
 
-    // Path looks like a file, try to determine its type
-    try {
-      const content = await fetch(
-        `/api/files/read?path=${encodeURIComponent(cleanPath)}`,
-      ).then((r) => r.text());
-      const metadata = blobManager.parseBlobMetadata(content);
+    // Path looks like a file, always open in File Editor first
+    // The FileEditor will detect blob metadata and show "View Media" button if applicable
+    setSelectedFile({
+      name: fileName,
+      path: cleanPath,
+      isDirectory: false,
+    });
+    setEditorPath(cleanPath);
+    setActiveTab("editor");
+    updateUrl("editor", cleanPath);
 
-      if (metadata) {
-        // It's blob metadata, open in Media Viewer
-        setImagePath(cleanPath);
-        setActiveTab("image");
-        updateUrl("image", cleanPath);
-      } else {
-        // It's a text file, open in File Editor
-        setSelectedFile({
-          name: fileName,
-          path: cleanPath,
-          isDirectory: false,
-        });
-        setEditorPath(cleanPath);
-        setActiveTab("editor");
-        updateUrl("editor", cleanPath);
-      }
-
-      // Update current path to the parent directory
-      const parentPath = getParentPath(cleanPath);
-      if (parentPath) {
-        setCurrentPath(parentPath);
-      }
-    } catch (error) {
-      console.error("Error reading file:", error);
-      // If file doesn't exist or can't be read, treat as directory
-      const dirPath = cleanPath.endsWith("/") ? cleanPath : cleanPath + "/";
-      setCurrentPath(dirPath);
-      setActiveTab("browser");
-      updateUrl("browser", dirPath);
+    // Update current path to the parent directory
+    const parentPath = getParentPath(cleanPath);
+    if (parentPath) {
+      setCurrentPath(parentPath);
     }
   }, [
-    blobManager,
     setCurrentPath,
     setActiveTab,
     updateUrl,
-    setImagePath,
     setSelectedFile,
     setEditorPath,
   ]);
@@ -436,6 +325,7 @@ export default function HomeContent() {
                   readOnlyMode={readOnlyMode}
                   onBackToBrowser={handleBackToBrowser}
                   onNavigateToPath={handleIntelligentNavigate}
+                  onViewMedia={handleViewMedia}
                   currentFolderPath={currentPath}
                 />
               </ErrorBoundary>

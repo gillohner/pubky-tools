@@ -7,7 +7,8 @@ import { SearchInput } from "@/components/ui/SearchInput";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { FileOperations } from "@/lib/file-operations";
-import { FileSchema, PubkyFile } from "@/types/index";
+import { BlobManager } from "@/lib/blob-manager";
+import { BlobMetadata, FileSchema, PubkyFile } from "@/types/index";
 import {
   getFileExtension,
   getFileName,
@@ -32,6 +33,7 @@ import {
   Edit,
   Eye,
   FileText,
+  Image,
   Maximize2,
   Minimize2,
   RefreshCw,
@@ -46,6 +48,7 @@ interface FileEditorProps {
   readOnlyMode?: boolean;
   onBackToBrowser?: () => void;
   onNavigateToPath?: (path: string) => void;
+  onViewMedia?: (path: string) => void;
   currentFolderPath?: string;
 }
 
@@ -201,6 +204,7 @@ export function FileEditor(
     readOnlyMode = false,
     onBackToBrowser,
     onNavigateToPath,
+    onViewMedia,
   }: FileEditorProps,
 ) {
   const { state } = useAuth();
@@ -223,6 +227,7 @@ export function FileEditor(
   const [previewMode, setPreviewMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(true);
+  const [blobMetadata, setBlobMetadata] = useState<BlobMetadata | null>(null);
   // Alert dialog state
   const [alertDialog, setAlertDialog] = useState<{
     isOpen: boolean;
@@ -240,6 +245,7 @@ export function FileEditor(
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const fileOps = FileOperations.getInstance();
+  const blobManager = BlobManager.getInstance();
 
   // Check if user has write access to current file
   const currentFilePath = getFullFilePath(currentFile, filePath);
@@ -272,7 +278,16 @@ export function FileEditor(
         setOriginalContent(content);
         setHasUnsavedChanges(false);
         setIsCreatingNew(false);
-        console.log("Successfully loaded file, length:", content.length);
+
+        // Check if this is blob metadata
+        const metadata = blobManager.parseBlobMetadata(content);
+        setBlobMetadata(metadata);
+
+        console.log(
+          "Successfully loaded file, length:",
+          content.length,
+          metadata ? "- detected blob metadata" : "",
+        );
       } else {
         // File could not be read
         const errorMsg =
@@ -284,6 +299,7 @@ export function FileEditor(
         setOriginalContent("");
         setHasUnsavedChanges(false);
         setIsCreatingNew(false);
+        setBlobMetadata(null);
       }
     } catch (error) {
       const errorMsg = `Failed to load file "${currentFile.name}": ${
@@ -296,10 +312,11 @@ export function FileEditor(
       setOriginalContent("");
       setHasUnsavedChanges(false);
       setIsCreatingNew(false);
+      setBlobMetadata(null);
     } finally {
       setIsLoading(false);
     }
-  }, [currentFile, fileOps, showError]);
+  }, [currentFile, fileOps, showError, blobManager]);
 
   const validateContent = useCallback(() => {
     const fileName = getFileName(currentFile, filePath);
@@ -638,6 +655,17 @@ export function FileEditor(
                 <Button variant="outline" size="sm" onClick={formatContent}>
                   <Code className="h-4 w-4 mr-1" />
                   Format
+                </Button>
+              )}
+              {blobMetadata && onViewMedia && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onViewMedia(blobMetadata.src)}
+                  title={`View ${blobMetadata.content_type}: ${blobMetadata.name}`}
+                >
+                  <Image className="h-4 w-4 mr-1" />
+                  View Media
                 </Button>
               )}
               {!readOnlyMode && (
