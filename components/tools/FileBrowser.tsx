@@ -60,7 +60,8 @@ export function FileBrowser(
   }: FileBrowserProps,
 ) {
   const { state } = useAuth();
-  const { showSuccess, showError, showProgress, updateToast, removeToast } = useToast();
+  const { showSuccess, showError, showProgress, updateToast, removeToast } =
+    useToast();
   const [currentPath, setCurrentPath] = useState(externalCurrentPath || "");
   const [files, setFiles] = useState<PubkyFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -291,8 +292,8 @@ export function FileBrowser(
             if (progressToastId) {
               updateToast(progressToastId, {
                 progress,
-                description: currentFile 
-                  ? `Processing: ${currentFile}` 
+                description: currentFile
+                  ? `Processing: ${currentFile}`
                   : `Creating ZIP file for "${file.name}"...`,
               });
             }
@@ -316,7 +317,7 @@ export function FileBrowser(
         );
 
         const content = await fileOps.readFile(file.path);
-        
+
         if (progressToastId) {
           updateToast(progressToastId, {
             progress: 50,
@@ -330,7 +331,7 @@ export function FileBrowser(
           const a = document.createElement("a");
           a.href = url;
           a.download = file.name;
-          
+
           if (progressToastId) {
             updateToast(progressToastId, {
               progress: 100,
@@ -346,7 +347,7 @@ export function FileBrowser(
           if (progressToastId) {
             removeToast(progressToastId);
           }
-          
+
           showSuccess(`"${file.name}" downloaded successfully`);
         } else {
           if (progressToastId) {

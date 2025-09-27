@@ -495,7 +495,7 @@ export class FileOperations {
       // Add each file to the ZIP with progress tracking
       for (let i = 0; i < allFiles.length; i++) {
         const file = allFiles[i];
-        
+
         try {
           // Update progress
           const progress = Math.round((i / allFiles.length) * 80); // Reserve 20% for ZIP generation
@@ -522,12 +522,12 @@ export class FileOperations {
       if (onProgress) {
         onProgress(85, "Generating ZIP file...");
       }
-      
-      const zipBlob = await zip.generateAsync({ 
+
+      const zipBlob = await zip.generateAsync({
         type: "blob",
         streamFiles: true,
         compression: "DEFLATE",
-        compressionOptions: { level: 6 }
+        compressionOptions: { level: 6 },
       });
 
       if (onProgress) {

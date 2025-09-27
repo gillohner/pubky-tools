@@ -65,12 +65,18 @@ function ToastComponent(
             <div className="mt-3">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-xs opacity-70">Progress</span>
-                <span className="text-xs opacity-70">{Math.round(toast.progress || 0)}%</span>
+                <span className="text-xs opacity-70">
+                  {Math.round(toast.progress || 0)}%
+                </span>
               </div>
               <div className="w-full bg-white/20 dark:bg-black/20 rounded-full h-2">
                 <div
                   className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300 ease-out"
-                  style={{ width: `${Math.min(Math.max(toast.progress || 0, 0), 100)}%` }}
+                  style={{
+                    width: `${
+                      Math.min(Math.max(toast.progress || 0, 0), 100)
+                    }%`,
+                  }}
                 />
               </div>
             </div>
