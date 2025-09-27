@@ -33,7 +33,7 @@ import {
   Edit,
   Eye,
   FileText,
-  Image,
+  Image as ImageIcon,
   Maximize2,
   Minimize2,
   RefreshCw,
@@ -664,7 +664,7 @@ export function FileEditor(
                   onClick={() => onViewMedia(blobMetadata.src)}
                   title={`View ${blobMetadata.content_type}: ${blobMetadata.name}`}
                 >
-                  <Image className="h-4 w-4 mr-1" />
+                  <ImageIcon className="h-4 w-4 mr-1" />
                   View Media
                 </Button>
               )}

@@ -39,6 +39,10 @@ export default function HomeContent() {
   const [imagePath, setImagePath] = useState<string>("");
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [currentPath, setCurrentPath] = useState<string>("");
+  // Track where media viewer was accessed from (browser or editor)
+  const [mediaViewerSource, setMediaViewerSource] = useState<
+    "browser" | "editor" | null
+  >(null);
 
   const { showSuccess, showError } = useToast();
 
@@ -103,8 +107,25 @@ export default function HomeContent() {
   };
 
   const handleBackToBrowser = () => {
+    // Calculate the correct path to navigate to
+    let targetPath = currentPath;
+
+    // If we're coming from media viewer, ensure we don't add extra slashes
+    if (activeTab === "image" && imagePath) {
+      // Get the parent directory of the current image/media file
+      const pathParts = imagePath.split("/").filter(Boolean);
+      if (pathParts.length > 1) {
+        // Remove the filename to get the directory
+        pathParts.pop();
+        targetPath = "/" + pathParts.join("/");
+      } else {
+        targetPath = "/";
+      }
+    }
+
     setActiveTab("browser");
-    updateUrl("browser", currentPath);
+    setMediaViewerSource(null);
+    updateUrl("browser", targetPath);
   };
 
   const handleFileCreated = useCallback((newFile?: PubkyFile) => {
@@ -136,8 +157,16 @@ export default function HomeContent() {
   const handleViewMedia = (blobPath: string) => {
     console.log("Opening blob in Media Viewer:", blobPath);
     setImagePath(blobPath);
+    // Track whether we came from editor or browser
+    setMediaViewerSource(activeTab === "editor" ? "editor" : "browser");
     setActiveTab("image");
     updateUrl("image", blobPath);
+  };
+
+  const handleBackToEditor = () => {
+    setActiveTab("editor");
+    setMediaViewerSource(null);
+    updateUrl("editor", editorPath);
   };
 
   // Copy path functionality
@@ -388,6 +417,8 @@ export default function HomeContent() {
                   onNavigateToPath={handleIntelligentNavigate}
                   onEditInTextEditor={handleEditInTextEditor}
                   onBack={handleBackToBrowser}
+                  onBackToEditor={handleBackToEditor}
+                  mediaViewerSource={mediaViewerSource}
                   readOnlyMode={readOnlyMode}
                 />
               </ErrorBoundary>

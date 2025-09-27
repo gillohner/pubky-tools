@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/useToast";
 import { NavigationHeader } from "@/components/ui/NavigationHeader";
 import {
   AlertCircle,
+  ArrowLeft,
   Download,
   Edit,
   FileText,
@@ -212,6 +213,8 @@ interface MediaViewerProps {
   onNavigateToPath?: (path: string) => void;
   onEditInTextEditor?: (file: PubkyFile) => void;
   onBack?: () => void;
+  onBackToEditor?: () => void;
+  mediaViewerSource?: "browser" | "editor" | null;
   readOnlyMode?: boolean;
 }
 
@@ -220,6 +223,8 @@ export function MediaViewer({
   onNavigateToPath,
   onEditInTextEditor,
   onBack,
+  onBackToEditor,
+  mediaViewerSource,
   readOnlyMode = false,
 }: MediaViewerProps) {
   const { state } = useAuth();
@@ -696,9 +701,23 @@ export function MediaViewer({
       {/* Media Content */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            {getMediaIcon()}
-            <span>{metadata.name || file.name}</span>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              {getMediaIcon()}
+              <span>{metadata.name || file.name}</span>
+            </div>
+            {/* Show back to JSON button if we came from editor */}
+            {mediaViewerSource === "editor" && onBackToEditor && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onBackToEditor}
+                className="flex items-center space-x-1"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back to JSON</span>
+              </Button>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
