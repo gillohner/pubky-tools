@@ -481,6 +481,7 @@ export class FileOperations {
   public async downloadDirectoryAsZip(
     directoryPath: string,
     directoryName: string,
+    onProgress?: (progress: number, currentFile?: string) => void,
   ): Promise<boolean> {
     try {
       // Dynamic import to avoid bundling JSZip if not used
@@ -491,9 +492,17 @@ export class FileOperations {
       const allFiles = await this.getAllFilesRecursively(directoryPath);
       console.log(`Creating ZIP with ${allFiles.length} files`);
 
-      // Add each file to the ZIP
-      for (const file of allFiles) {
+      // Add each file to the ZIP with progress tracking
+      for (let i = 0; i < allFiles.length; i++) {
+        const file = allFiles[i];
+        
         try {
+          // Update progress
+          const progress = Math.round((i / allFiles.length) * 80); // Reserve 20% for ZIP generation
+          if (onProgress) {
+            onProgress(progress, file.name);
+          }
+
           const content = await this.readFile(file.path);
           if (content !== null) {
             // Get relative path within the directory
@@ -510,7 +519,20 @@ export class FileOperations {
       }
 
       // Generate the ZIP file
-      const zipBlob = await zip.generateAsync({ type: "blob" });
+      if (onProgress) {
+        onProgress(85, "Generating ZIP file...");
+      }
+      
+      const zipBlob = await zip.generateAsync({ 
+        type: "blob",
+        streamFiles: true,
+        compression: "DEFLATE",
+        compressionOptions: { level: 6 }
+      });
+
+      if (onProgress) {
+        onProgress(95, "Preparing download...");
+      }
 
       // Download the ZIP file
       const url = URL.createObjectURL(zipBlob);
@@ -521,6 +543,10 @@ export class FileOperations {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+
+      if (onProgress) {
+        onProgress(100, "Download complete!");
+      }
 
       return true;
     } catch (error) {

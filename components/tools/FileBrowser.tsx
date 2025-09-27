@@ -60,7 +60,7 @@ export function FileBrowser(
   }: FileBrowserProps,
 ) {
   const { state } = useAuth();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError, showProgress, updateToast, removeToast } = useToast();
   const [currentPath, setCurrentPath] = useState(externalCurrentPath || "");
   const [files, setFiles] = useState<PubkyFile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -274,38 +274,91 @@ export function FileBrowser(
   };
 
   const handleDownloadFile = async (file: PubkyFile) => {
+    let progressToastId: string | null = null;
+
     try {
       if (file.isDirectory) {
-        // Download folder as ZIP
-        showSuccess("Preparing folder for download...");
+        // Download folder as ZIP with progress
+        progressToastId = showProgress(
+          "Preparing ZIP Download",
+          `Creating ZIP file for "${file.name}"...`,
+        );
+
         const success = await fileOps.downloadDirectoryAsZip(
           file.path,
           file.name,
+          (progress: number, currentFile?: string) => {
+            if (progressToastId) {
+              updateToast(progressToastId, {
+                progress,
+                description: currentFile 
+                  ? `Processing: ${currentFile}` 
+                  : `Creating ZIP file for "${file.name}"...`,
+              });
+            }
+          },
         );
+
+        if (progressToastId) {
+          removeToast(progressToastId);
+        }
+
         if (success) {
           showSuccess(`Folder "${file.name}" downloaded as ZIP successfully`);
         } else {
           showError("Failed to download folder");
         }
       } else {
-        // Download single file
+        // Download single file with progress for larger files
+        progressToastId = showProgress(
+          "Downloading File",
+          `Preparing "${file.name}"...`,
+        );
+
         const content = await fileOps.readFile(file.path);
+        
+        if (progressToastId) {
+          updateToast(progressToastId, {
+            progress: 50,
+            description: "Processing file...",
+          });
+        }
+
         if (content !== null) {
           const blob = new Blob([content], { type: "text/plain" });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
           a.download = file.name;
+          
+          if (progressToastId) {
+            updateToast(progressToastId, {
+              progress: 100,
+              description: "Download starting...",
+            });
+          }
+
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
+
+          if (progressToastId) {
+            removeToast(progressToastId);
+          }
+          
           showSuccess(`"${file.name}" downloaded successfully`);
         } else {
+          if (progressToastId) {
+            removeToast(progressToastId);
+          }
           showError("Failed to download file");
         }
       }
     } catch (error) {
+      if (progressToastId) {
+        removeToast(progressToastId);
+      }
       showError(`Failed to download: ${error}`);
     }
   };
